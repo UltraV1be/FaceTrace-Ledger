@@ -43,7 +43,7 @@ from src.utils.logger import (
 from src.utils.helpers import save_json, load_json, get_utc_timestamp
 
 
-def run_pipeline(image_path_str: str) -> bool:
+def run_pipeline(image_path_str: str, require_social_media: bool = False) -> bool:
     """Execute full end-to-end FaceTrace Ledger pipeline."""
     log_header("FaceTrace Ledger", "Face Search + Blockchain Verification Pipeline")
 
@@ -101,16 +101,19 @@ def run_pipeline(image_path_str: str) -> bool:
         print("\n[WHAT FAILED] No candidate results returned by search provider.\n[WHY IT FAILED] The image may not be indexed or publicly available.\n[WHAT TO DO] Try an image indexed on the public web.")
         return False
 
-    # Step 5: Candidate verification
-    log_step(5, TOTAL_STEPS, "Verifying candidate results")
+    # Step 5: Candidate verification & Social Media Prioritization
+    log_step(5, TOTAL_STEPS, "Classifying & verifying candidate results (Social Media Prioritized)")
     parsed_candidates = parse_search_results(raw_results)
+    social_count = sum(1 for c in parsed_candidates if c.get("is_social_media"))
     log_info("Valid URLs Parsed", len(parsed_candidates))
+    log_info("Social Media URLs Identified", social_count)
 
     verifier = CandidateVerifier(detector=detector, encoder=encoder)
     best_candidate, evaluated_candidates = verifier.verify_candidates(
         input_embedding=input_embedding,
         candidates=parsed_candidates,
-        max_candidates_to_check=10
+        max_candidates_to_check=12,
+        require_social_media=require_social_media
     )
 
     if not best_candidate:
@@ -120,7 +123,17 @@ def run_pipeline(image_path_str: str) -> bool:
 
     print(f"\n  {BOLD}{GREEN}BEST VERIFIED CANDIDATE{RESET}")
     print(f"  URL: {best_candidate.get('url')}")
+    print(f"  Result Type: {best_candidate.get('result_type')}")
+    print(f"  Platform: {best_candidate.get('social_platform') or 'general_web'}")
     print(f"  Similarity: {best_candidate.get('similarity_score')}")
+
+    # Compute candidate image hash if local file exists
+    candidate_img_hash = None
+    if best_candidate.get("candidate_local_image"):
+        try:
+            candidate_img_hash = hash_file(Path(best_candidate["candidate_local_image"]))
+        except Exception:
+            pass
 
     # Step 6: Creating verification record
     log_step(6, TOTAL_STEPS, "Creating canonical verification record")
@@ -130,7 +143,12 @@ def run_pipeline(image_path_str: str) -> bool:
         result_title=best_candidate.get("page_title", "Untitled Match"),
         image_sha256=image_sha256,
         similarity_score=best_candidate.get("similarity_score", 0.0),
-        search_provider=config.reverse_search_provider
+        search_provider=config.reverse_search_provider,
+        result_type=best_candidate.get("result_type", "GENERAL_WEB_RESULT"),
+        is_social_media=best_candidate.get("is_social_media", False),
+        social_platform=best_candidate.get("social_platform"),
+        similarity_threshold=config.face_match_threshold,
+        candidate_image_sha256=candidate_img_hash
     )
     record_file = config.results_dir / "verification_record.json"
     save_json(record, record_file)
@@ -196,8 +214,12 @@ def run_pipeline(image_path_str: str) -> bool:
         "image_sha256": image_sha256,
         "source_url": record["source_url"],
         "source_domain": record["source_domain"],
+        "result_type": record["result_type"],
+        "is_social_media": record["is_social_media"],
+        "social_platform": record["social_platform"],
         "result_title": record["result_title"],
         "similarity_score": record["similarity_score"],
+        "similarity_threshold": record["similarity_threshold"],
         "search_provider": record["search_provider"],
         "record_hash_sha256": record_hash,
         "transaction_hash": upload_result["transaction_hash"],
@@ -283,12 +305,13 @@ def demo_tamper(record_path_str: str) -> bool:
         if orig_check["verified"]:
             log_success("Original record registered and verified.")
 
-    # Step 2: Create tampered copy
+    # Step 2: Create tampered copy by modifying social media metadata or score
     print(f"\n{BOLD}--- STEP 2: CREATING TAMPERED RECORD ---{RESET}")
     tampered_record = dict(original_record)
-    old_score = tampered_record.get("similarity_score", 0.85)
-    tampered_record["similarity_score"] = 0.9999  # Tamper similarity score
-    tampered_record["source_url"] = "https://malicious-tampered-site.org/fake_profile.html"
+    tampered_record["social_platform"] = "fabricated_instagram"
+    tampered_record["result_type"] = "SOCIAL_MEDIA_POST"
+    tampered_record["similarity_score"] = 0.9999
+    tampered_record["source_url"] = "https://www.instagram.com/p/fabricated_tampered_id/"
 
     tampered_hash = hash_record(tampered_record)["hash"]
     log_info("Original Hash", orig_hash)
@@ -317,6 +340,7 @@ def main():
     # Command: run
     run_parser = subparsers.add_parser("run", help="Run full pipeline on an input image")
     run_parser.add_argument("--image", required=True, help="Path to input photograph containing face")
+    run_parser.add_argument("--require-social-media", action="store_true", help="Enforce only verified social media matches")
 
     # Command: verify
     verify_parser = subparsers.add_parser("verify", help="Verify a verification_record.json against blockchain")
@@ -329,7 +353,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "run":
-        success = run_pipeline(args.image)
+        success = run_pipeline(args.image, require_social_media=args.require_social_media)
         sys.exit(0 if success else 1)
     elif args.command == "verify":
         success = verify_record_file(args.record)

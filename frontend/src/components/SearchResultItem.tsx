@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, CheckCircle, XCircle, Globe } from 'lucide-react';
+import { ExternalLink, CheckCircle, XCircle, Globe, Share2, UserCheck, Layers } from 'lucide-react';
 import { CandidateResult } from '../types/pipeline';
 import { getFullMediaUrl } from '../services/api';
 
@@ -17,6 +17,8 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
   const thumbUrl = candidate.display_image_url || candidate.thumbnail_url;
   const fullThumb = getFullMediaUrl(thumbUrl);
   const scorePercent = (candidate.similarity_score * 100).toFixed(1);
+  const rtype = candidate.result_type || 'GENERAL_WEB_RESULT';
+  const platform = candidate.social_platform;
 
   return (
     <div
@@ -48,17 +50,53 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
           )}
 
           <div className="min-w-0">
-            <div className="flex items-center space-x-2 mb-1">
+            {/* Badges Bar */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
               <span className="font-mono text-xs font-bold text-[#F50064]">
                 #{String(index + 1).padStart(2, '0')}
               </span>
-              <span className="px-2 py-0.5 bg-[#0A2E23] text-[#FAF7F0] text-[10px] font-mono uppercase font-bold flex items-center gap-1">
-                <Globe className="w-2.5 h-2.5 text-[#00E599]" />
-                {candidate.domain || 'web'}
-              </span>
+
+              {/* Platform Badge */}
+              {platform ? (
+                <span className="px-2 py-0.5 bg-[#0A2E23] text-[#00E599] text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                  <Globe className="w-2.5 h-2.5 text-[#00E599]" />
+                  {platform.toUpperCase()}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 bg-[#141414] text-[#FAF7F0] text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                  <Globe className="w-2.5 h-2.5 text-[#AAAAAA]" />
+                  {candidate.domain || 'web'}
+                </span>
+              )}
+
+              {/* Result Type Badge */}
+              {rtype === 'SOCIAL_MEDIA_POST' && (
+                <span className="px-2 py-0.5 bg-[#F50064] text-white text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                  <Share2 className="w-2.5 h-2.5" />
+                  POST
+                </span>
+              )}
+              {rtype === 'SOCIAL_MEDIA_PROFILE' && (
+                <span className="px-2 py-0.5 bg-[#1D6B56] text-white text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                  <UserCheck className="w-2.5 h-2.5" />
+                  PROFILE
+                </span>
+              )}
+              {rtype === 'SOCIAL_MEDIA_PAGE' && (
+                <span className="px-2 py-0.5 bg-[#555555] text-white text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                  <Layers className="w-2.5 h-2.5" />
+                  PAGE
+                </span>
+              )}
+              {rtype === 'GENERAL_WEB_RESULT' && (
+                <span className="px-2 py-0.5 bg-[#EBE3D0] text-[#141414] text-[10px] font-mono uppercase font-bold border border-[#141414]/30">
+                  GENERAL WEB
+                </span>
+              )}
+
               {isBestMatch && (
-                <span className="px-2 py-0.5 bg-[#F50064] text-white text-[10px] font-mono uppercase font-bold">
-                  ★ TOP VERIFIED CANDIDATE
+                <span className="px-2 py-0.5 bg-[#00E599] text-[#0A2E23] text-[10px] font-mono uppercase font-black">
+                  ★ TOP VERIFIED MATCH
                 </span>
               )}
             </div>

@@ -23,6 +23,12 @@ export interface StageInfo {
   data?: Record<string, any>;
 }
 
+export type ResultType = 
+  | 'SOCIAL_MEDIA_POST' 
+  | 'SOCIAL_MEDIA_PROFILE' 
+  | 'SOCIAL_MEDIA_PAGE' 
+  | 'GENERAL_WEB_RESULT';
+
 export interface CandidateResult {
   url: string;
   domain: string;
@@ -31,6 +37,9 @@ export interface CandidateResult {
   display_image_url?: string;
   description?: string;
   provider: string;
+  is_social_media?: boolean;
+  social_platform?: string | null;
+  result_type?: ResultType;
   similarity_score: number;
   face_detected: boolean;
   match: boolean;
@@ -56,9 +65,14 @@ export interface VerificationRecord {
   record_version: string;
   source_url: string;
   source_domain: string;
+  result_type: ResultType | string;
+  is_social_media: boolean;
+  social_platform?: string | null;
   result_title: string;
   image_sha256: string;
+  candidate_image_sha256?: string | null;
   similarity_score: number;
+  similarity_threshold: number;
   search_provider: string;
   verified_at: string;
 }
@@ -77,6 +91,7 @@ export interface PipelineResult {
   search: {
     provider: string;
     results_found: number;
+    social_media_count?: number;
   };
   candidates: CandidateResult[];
   best_match: CandidateResult;
@@ -107,6 +122,8 @@ export interface TraceHistoryItem {
   status: 'verified' | 'no_match' | 'failed';
   score?: number;
   domain?: string;
+  result_type?: string;
+  social_platform?: string | null;
   record_hash_short?: string;
   tx_hash_short?: string;
 }

@@ -1,7 +1,7 @@
 """
 FastAPI Server for FaceTrace Ledger.
 Provides REST and Server-Sent Events (SSE) endpoints for real-time pipeline execution,
-blockchain verification, tamper testing, and candidate image serving.
+blockchain verification, tamper testing, and candidate image serving with social media provenance.
 """
 
 import sys
@@ -38,8 +38,8 @@ from src.utils.helpers import save_json, load_json
 
 app = FastAPI(
     title="FaceTrace Ledger API",
-    description="Forensic Biometric Search & Blockchain Verification API",
-    version="1.0.0"
+    description="Forensic Biometric Search & Blockchain Verification API with Social Media Classification",
+    version="1.1.0"
 )
 
 # Enable CORS for local development
@@ -83,7 +83,7 @@ async def push_event(job_id: str, stage: str, status: str, message: str, data: O
         await job_queues[job_id].put(event_payload)
 
 
-def run_pipeline_sync(job_id: str, image_path: Path):
+def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool = False):
     """Synchronous worker running the full pipeline while broadcasting async events."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -143,8 +143,12 @@ def run_pipeline_sync(job_id: str, image_path: Path):
             jobs[job_id]["error"] = str(e)
             return
 
-        loop.run_until_complete(push_event(job_id, "reverse_search", "success", f"Search completed ({len(raw_results)} results)", {
+        parsed_candidates = parse_search_results(raw_results)
+        social_count = sum(1 for c in parsed_candidates if c.get("is_social_media"))
+
+        loop.run_until_complete(push_event(job_id, "reverse_search", "success", f"Search completed ({len(raw_results)} results, {social_count} social)", {
             "results_found": len(raw_results),
+            "social_media_count": social_count,
             "provider": config.reverse_search_provider
         }))
 
@@ -153,14 +157,14 @@ def run_pipeline_sync(job_id: str, image_path: Path):
             jobs[job_id]["status"] = "no_match"
             return
 
-        # Step 5: Candidate Verification
-        loop.run_until_complete(push_event(job_id, "candidate_verification", "processing", "Downloading and comparing candidate faces"))
-        parsed_candidates = parse_search_results(raw_results)
+        # Step 5: Candidate Verification & Social Media Prioritization
+        loop.run_until_complete(push_event(job_id, "candidate_verification", "processing", "Prioritizing social media posts and comparing candidate faces"))
         verifier = CandidateVerifier(detector=detector, encoder=encoder)
         best_candidate, evaluated_candidates = verifier.verify_candidates(
             input_embedding=input_embedding,
             candidates=parsed_candidates,
-            max_candidates_to_check=8
+            max_candidates_to_check=12,
+            require_social_media=require_social_media
         )
 
         # Format candidate image URLs for frontend display
@@ -185,20 +189,32 @@ def run_pipeline_sync(job_id: str, image_path: Path):
         best_media_url = f"/media/candidates/{Path(best_local_img).name}" if best_local_img and Path(best_local_img).exists() else best_candidate.get("thumbnail_url")
         best_candidate["display_image_url"] = best_media_url
 
-        loop.run_until_complete(push_event(job_id, "candidate_verification", "success", "Candidate similarity passed threshold", {
+        cand_img_hash = None
+        if best_local_img and Path(best_local_img).exists():
+            try:
+                cand_img_hash = hash_file(Path(best_local_img))
+            except Exception:
+                pass
+
+        loop.run_until_complete(push_event(job_id, "candidate_verification", "success", f"Candidate match verified ({best_candidate.get('result_type', 'MATCH')})", {
             "best_candidate": best_candidate,
             "candidates": formatted_candidates
         }))
 
         # Step 6: Canonical Record
-        loop.run_until_complete(push_event(job_id, "canonical_record", "processing", "Constructing canonical JSON record"))
+        loop.run_until_complete(push_event(job_id, "canonical_record", "processing", "Constructing canonical JSON record with social provenance"))
         record = build_verification_record(
             source_url=best_candidate.get("url", ""),
             source_domain=best_candidate.get("domain", ""),
             result_title=best_candidate.get("page_title", "Web Match"),
             image_sha256=image_sha256,
             similarity_score=best_candidate.get("similarity_score", 0.0),
-            search_provider=config.reverse_search_provider
+            search_provider=config.reverse_search_provider,
+            result_type=best_candidate.get("result_type", "GENERAL_WEB_RESULT"),
+            is_social_media=best_candidate.get("is_social_media", False),
+            social_platform=best_candidate.get("social_platform"),
+            similarity_threshold=config.face_match_threshold,
+            candidate_image_sha256=cand_img_hash
         )
         save_json(record, config.results_dir / "verification_record.json")
         loop.run_until_complete(push_event(job_id, "canonical_record", "success", "Canonical record created", {"record": record}))
@@ -249,7 +265,8 @@ def run_pipeline_sync(job_id: str, image_path: Path):
             },
             "search": {
                 "provider": config.reverse_search_provider,
-                "results_found": len(raw_results)
+                "results_found": len(raw_results),
+                "social_media_count": social_count
             },
             "candidates": formatted_candidates,
             "best_match": best_candidate,
@@ -288,9 +305,10 @@ def run_pipeline_sync(job_id: str, image_path: Path):
 async def run_pipeline_endpoint(
     background_tasks: BackgroundTasks,
     image: Optional[UploadFile] = File(None),
-    sample_filename: Optional[str] = Form(None)
+    sample_filename: Optional[str] = Form(None),
+    require_social_media: bool = Form(False)
 ):
-    """Initiate a new pipeline execution job."""
+    """Initiate a new pipeline execution job with optional social media post requirement."""
     job_id = str(uuid.uuid4())
     job_queues[job_id] = asyncio.Queue()
     jobs[job_id] = {
@@ -319,7 +337,7 @@ async def run_pipeline_endpoint(
             fallback = config.input_dir / "sample_portrait.jpg"
         target_path = fallback
 
-    background_tasks.add_task(run_pipeline_sync, job_id, target_path)
+    background_tasks.add_task(run_pipeline_sync, job_id, target_path, require_social_media)
     return {"job_id": job_id, "status": "initialized", "image_path": str(target_path.name)}
 
 

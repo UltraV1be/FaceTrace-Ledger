@@ -84,13 +84,15 @@ export function generatePdfReport(result: PipelineResult): void {
   y += 2;
 
   // Section 2: Search & Discovered Candidate
-  drawSectionHeader('02', 'DYNAMIC WEB SEARCH & CANDIDATE MATCH');
+  drawSectionHeader('02', 'DYNAMIC SEARCH & SOCIAL MEDIA MATCH');
   drawField('Search Provider', result.search.provider.toUpperCase());
-  drawField('Results Found', `${result.search.results_found} Dynamic Web Visual Matches`);
+  drawField('Results Found', `${result.search.results_found} Web Matches (${result.search.social_media_count ?? 0} Social Media)`);
+  drawField('Result Type', (result.record?.result_type || result.best_match?.result_type || 'GENERAL_WEB_RESULT').replace(/_/g, ' '));
+  drawField('Social Platform', (result.record?.social_platform || result.best_match?.social_platform || 'N/A').toUpperCase());
   drawField('Source Domain', result.record?.source_domain || result.best_match?.domain || 'N/A');
   drawField('Source URL', result.record?.source_url || result.best_match?.url || 'N/A');
   drawField('Match Title', result.record?.result_title || result.best_match?.page_title || 'Untitled');
-  drawField('Similarity Score', `${((result.record?.similarity_score ?? result.best_match?.similarity_score ?? 0) * 100).toFixed(2)}% (Threshold: 65.0%)`);
+  drawField('Similarity Score', `${((result.record?.similarity_score ?? result.best_match?.similarity_score ?? 0) * 100).toFixed(2)}% (Threshold: ${(result.record?.similarity_threshold ?? 0.65) * 100}%)`);
 
   y += 2;
 
