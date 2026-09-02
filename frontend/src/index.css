@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-forest-950: #071F17;
+  --color-forest-900: #0A2E23;
+  --color-forest-800: #0D3B2E;
+  --color-forest-700: #144F3F;
+  --color-forest-600: #1D6B56;
+  
+  --color-cream-50: #FAF7F0;
+  --color-cream-100: #F5F0E3;
+  --color-cream-200: #EBE3D0;
+  --color-cream-300: #DED3BA;
+
+  --color-pink: #F50064;
+  --color-pink-hot: #FF006E;
+  --color-pink-light: #FF3388;
+  --color-pink-glow: rgba(245, 0, 100, 0.15);
+
+  --color-charcoal: #141414;
+  --color-charcoal-light: #242424;
+  --color-charcoal-muted: #525252;
+
+  --color-emerald: #00E599;
+  --color-emerald-glow: rgba(0, 229, 153, 0.15);
+
+  --font-display: 'Syne', sans-serif;
+  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --shadow-brutal: 4px 4px 0px 0px #141414;
+  --shadow-brutal-pink: 4px 4px 0px 0px #F50064;
+  --shadow-brutal-green: 4px 4px 0px 0px #0A2E23;
+  --shadow-brutal-sm: 2px 2px 0px 0px #141414;
+  --shadow-brutal-lg: 8px 8px 0px 0px #141414;
+}
+
+@layer base {
+  body {
+    background-color: #071F17;
+    color: #F5F0E3;
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+/* Technical forensic grid background */
+.bg-forensic-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(245, 240, 227, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 240, 227, 0.04) 1px, transparent 1px);
+}
+
+.bg-cream-grid {
+  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, rgba(20, 20, 20, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 20, 20, 0.05) 1px, transparent 1px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #071F17;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1D6B56;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #F50064;
+}
+
+/* Shadows fallback */
+.shadow-brutal {
+  box-shadow: 4px 4px 0px 0px #141414;
+}
+
+.shadow-brutal-pink {
+  box-shadow: 4px 4px 0px 0px #F50064;
+}
+
+.shadow-brutal-green {
+  box-shadow: 4px 4px 0px 0px #0A2E23;
+}
+
+.shadow-brutal-sm {
+  box-shadow: 2px 2px 0px 0px #141414;
+}
+
+.shadow-brutal-lg {
+  box-shadow: 8px 8px 0px 0px #141414;
+}

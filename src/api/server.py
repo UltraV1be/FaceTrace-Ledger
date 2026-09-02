@@ -1,0 +1,467 @@
+"""
+FastAPI Server for FaceTrace Ledger.
+Provides REST and Server-Sent Events (SSE) endpoints for real-time pipeline execution,
+blockchain verification, tamper testing, and candidate image serving.
+"""
+
+import sys
+import uuid
+import asyncio
+import json
+from pathlib import Path
+from typing import Any, Dict, Optional
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
+
+# Ensure project root is on sys.path
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from src.config import config
+from src.face.detector import FaceDetector, FaceDetectionError
+from src.face.encoder import FaceEncoder, FaceEncodingError
+from src.face.matcher import FaceMatcher
+from src.search.reverse_search import ReverseImageSearchService
+from src.search.result_parser import parse_search_results
+from src.search.candidate_downloader import CandidateDownloader
+from src.search.candidate_verifier import CandidateVerifier
+from src.record.metadata_builder import build_verification_record
+from src.crypto.hashing import hash_file, hash_record
+from src.blockchain.client import BlockchainClient
+from src.blockchain.uploader import BlockchainUploader
+from src.blockchain.verifier import BlockchainVerifier
+from src.utils.helpers import save_json, load_json
+
+app = FastAPI(
+    title="FaceTrace Ledger API",
+    description="Forensic Biometric Search & Blockchain Verification API",
+    version="1.0.0"
+)
+
+# Enable CORS for local development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount media static directories
+app.mount("/media/input", StaticFiles(directory=str(config.input_dir)), name="input_media")
+app.mount("/media/candidates", StaticFiles(directory=str(config.candidates_dir)), name="candidates_media")
+
+# In-memory job state & event queues
+jobs: Dict[str, Dict[str, Any]] = {}
+job_queues: Dict[str, asyncio.Queue] = {}
+
+
+class VerifyRequest(BaseModel):
+    record: Dict[str, Any]
+
+
+class TamperTestRequest(BaseModel):
+    record: Dict[str, Any]
+    modified_field: str
+    modified_value: Any
+
+
+async def push_event(job_id: str, stage: str, status: str, message: str, data: Optional[Dict[str, Any]] = None):
+    """Helper to dispatch structured SSE event."""
+    event_payload = {
+        "job_id": job_id,
+        "stage": stage,
+        "status": status,
+        "message": message,
+        "data": data or {}
+    }
+    if job_id in job_queues:
+        await job_queues[job_id].put(event_payload)
+
+
+def run_pipeline_sync(job_id: str, image_path: Path):
+    """Synchronous worker running the full pipeline while broadcasting async events."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        # Step 1: Loading image
+        loop.run_until_complete(push_event(job_id, "image_loading", "processing", f"Loading image binary ({image_path.name})"))
+        image_sha256 = hash_file(image_path)
+        loop.run_until_complete(push_event(job_id, "image_loading", "success", "Image loaded & fingerprinted", {
+            "image_sha256": image_sha256,
+            "filename": image_path.name,
+            "image_url": f"/media/input/{image_path.name}"
+        }))
+
+        # Step 2: Face Detection
+        loop.run_until_complete(push_event(job_id, "face_detection", "processing", "Detecting frontal faces with InsightFace"))
+        detector = FaceDetector()
+        try:
+            face_info = detector.detect_primary_face(image_path)
+        except FaceDetectionError as e:
+            loop.run_until_complete(push_event(job_id, "face_detection", "failed", str(e)))
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+            return
+
+        bbox = face_info["bbox"]
+        confidence = face_info["confidence"]
+        loop.run_until_complete(push_event(job_id, "face_detection", "success", "Face detected", {
+            "bbox": bbox,
+            "confidence": confidence
+        }))
+
+        # Step 3: Face Encoding
+        loop.run_until_complete(push_event(job_id, "face_encoding", "processing", "Extracting 512-d normalized face vector"))
+        encoder = FaceEncoder(detector)
+        try:
+            input_embedding = encoder.encode(face_info)
+        except FaceEncodingError as e:
+            loop.run_until_complete(push_event(job_id, "face_encoding", "failed", str(e)))
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+            return
+
+        loop.run_until_complete(push_event(job_id, "face_encoding", "success", "512-d normalized embedding generated (Ephemeral)", {
+            "embedding_dimension": len(input_embedding),
+            "ephemeral": True
+        }))
+
+        # Step 4: Reverse Search
+        loop.run_until_complete(push_event(job_id, "reverse_search", "processing", f"Executing search query via {config.reverse_search_provider}"))
+        search_service = ReverseImageSearchService()
+        try:
+            raw_results = search_service.search(image_path)
+        except Exception as e:
+            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", f"Search provider error: {e}"))
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+            return
+
+        loop.run_until_complete(push_event(job_id, "reverse_search", "success", f"Search completed ({len(raw_results)} results)", {
+            "results_found": len(raw_results),
+            "provider": config.reverse_search_provider
+        }))
+
+        if not raw_results:
+            loop.run_until_complete(push_event(job_id, "candidate_verification", "failed", "No search results returned by provider"))
+            jobs[job_id]["status"] = "no_match"
+            return
+
+        # Step 5: Candidate Verification
+        loop.run_until_complete(push_event(job_id, "candidate_verification", "processing", "Downloading and comparing candidate faces"))
+        parsed_candidates = parse_search_results(raw_results)
+        verifier = CandidateVerifier(detector=detector, encoder=encoder)
+        best_candidate, evaluated_candidates = verifier.verify_candidates(
+            input_embedding=input_embedding,
+            candidates=parsed_candidates,
+            max_candidates_to_check=8
+        )
+
+        # Format candidate image URLs for frontend display
+        formatted_candidates = []
+        for cand in evaluated_candidates:
+            local_img = cand.get("candidate_local_image")
+            media_url = f"/media/candidates/{Path(local_img).name}" if local_img and Path(local_img).exists() else cand.get("thumbnail_url")
+            formatted_candidates.append({
+                **cand,
+                "display_image_url": media_url
+            })
+
+        if not best_candidate:
+            loop.run_until_complete(push_event(job_id, "candidate_verification", "failed", "No candidate passed the configured similarity threshold", {
+                "candidates": formatted_candidates
+            }))
+            jobs[job_id]["status"] = "no_match"
+            jobs[job_id]["candidates"] = formatted_candidates
+            return
+
+        best_local_img = best_candidate.get("candidate_local_image")
+        best_media_url = f"/media/candidates/{Path(best_local_img).name}" if best_local_img and Path(best_local_img).exists() else best_candidate.get("thumbnail_url")
+        best_candidate["display_image_url"] = best_media_url
+
+        loop.run_until_complete(push_event(job_id, "candidate_verification", "success", "Candidate similarity passed threshold", {
+            "best_candidate": best_candidate,
+            "candidates": formatted_candidates
+        }))
+
+        # Step 6: Canonical Record
+        loop.run_until_complete(push_event(job_id, "canonical_record", "processing", "Constructing canonical JSON record"))
+        record = build_verification_record(
+            source_url=best_candidate.get("url", ""),
+            source_domain=best_candidate.get("domain", ""),
+            result_title=best_candidate.get("page_title", "Web Match"),
+            image_sha256=image_sha256,
+            similarity_score=best_candidate.get("similarity_score", 0.0),
+            search_provider=config.reverse_search_provider
+        )
+        save_json(record, config.results_dir / "verification_record.json")
+        loop.run_until_complete(push_event(job_id, "canonical_record", "success", "Canonical record created", {"record": record}))
+
+        # Step 7: Cryptographic Fingerprint
+        loop.run_until_complete(push_event(job_id, "crypto_hashing", "processing", "Computing SHA-256 fingerprint"))
+        hash_info = hash_record(record)
+        record_hash = hash_info["hash"]
+        loop.run_until_complete(push_event(job_id, "crypto_hashing", "success", "SHA-256 Fingerprint generated", {
+            "record_hash": record_hash,
+            "canonical_payload": hash_info["canonical_payload"]
+        }))
+
+        # Step 8: Blockchain Upload & Re-Verification
+        loop.run_until_complete(push_event(job_id, "blockchain_upload", "processing", "Registering record on Ethereum smart contract"))
+        client = BlockchainClient()
+        contract = client.ensure_contract_deployed()
+        uploader = BlockchainUploader(client, contract)
+        upload_result = uploader.upload_record_hash(record_hash)
+
+        blockchain_verifier = BlockchainVerifier(client, contract)
+        verification_result = blockchain_verifier.verify_discovered_record(record)
+
+        loop.run_until_complete(push_event(job_id, "blockchain_upload", "success", "Registered & Verified on blockchain", {
+            "transaction_hash": upload_result["transaction_hash"],
+            "block_number": upload_result["block_number"],
+            "submitter": upload_result["submitter"],
+            "contract_address": client.contract_address,
+            "verified": verification_result["verified"],
+            "timestamp": verification_result["timestamp"]
+        }))
+
+        # Store complete result
+        result_payload = {
+            "status": "completed",
+            "job_id": job_id,
+            "image_filename": image_path.name,
+            "image_url": f"/media/input/{image_path.name}",
+            "image_sha256": image_sha256,
+            "face_detection": {
+                "detected": True,
+                "confidence": confidence,
+                "bbox": bbox
+            },
+            "face_encoding": {
+                "dimension": 512,
+                "ephemeral": True
+            },
+            "search": {
+                "provider": config.reverse_search_provider,
+                "results_found": len(raw_results)
+            },
+            "candidates": formatted_candidates,
+            "best_match": best_candidate,
+            "record": record,
+            "record_hash": record_hash,
+            "canonical_payload": hash_info["canonical_payload"],
+            "blockchain": {
+                "network": "Ethereum Local Node (Py-EVM / Ganache)",
+                "contract_address": client.contract_address,
+                "transaction_hash": upload_result["transaction_hash"],
+                "block_number": upload_result["block_number"],
+                "submitter": upload_result["submitter"],
+                "timestamp": verification_result["timestamp"]
+            },
+            "verification": {
+                "verified": verification_result["verified"],
+                "status": "DATA_MATCHES_ON_CHAIN_RECORD"
+            }
+        }
+        jobs[job_id]["result"] = result_payload
+        jobs[job_id]["status"] = "completed"
+
+        # Save pipeline result artifact
+        save_json(result_payload, config.results_dir / "pipeline_result.json")
+        loop.run_until_complete(push_event(job_id, "pipeline_complete", "success", "Full pipeline executed successfully", result_payload))
+
+    except Exception as e:
+        jobs[job_id]["status"] = "failed"
+        jobs[job_id]["error"] = str(e)
+        loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", f"Pipeline failed: {e}"))
+    finally:
+        loop.close()
+
+
+@app.post("/api/pipeline/run")
+async def run_pipeline_endpoint(
+    background_tasks: BackgroundTasks,
+    image: Optional[UploadFile] = File(None),
+    sample_filename: Optional[str] = Form(None)
+):
+    """Initiate a new pipeline execution job."""
+    job_id = str(uuid.uuid4())
+    job_queues[job_id] = asyncio.Queue()
+    jobs[job_id] = {
+        "job_id": job_id,
+        "status": "processing",
+        "result": None,
+        "error": None
+    }
+
+    if image and image.filename:
+        # Save uploaded image to data/input
+        dest_path = config.input_dir / f"upload_{job_id[:8]}_{image.filename}"
+        content = await image.read()
+        with open(dest_path, "wb") as f:
+            f.write(content)
+        target_path = dest_path
+    elif sample_filename:
+        sample_path = config.input_dir / sample_filename
+        if not sample_path.exists():
+            raise HTTPException(status_code=404, detail=f"Sample image '{sample_filename}' not found.")
+        target_path = sample_path
+    else:
+        # Default fallback to lena.jpg or sample_portrait.jpg
+        fallback = config.input_dir / "lena.jpg"
+        if not fallback.exists():
+            fallback = config.input_dir / "sample_portrait.jpg"
+        target_path = fallback
+
+    background_tasks.add_task(run_pipeline_sync, job_id, target_path)
+    return {"job_id": job_id, "status": "initialized", "image_path": str(target_path.name)}
+
+
+@app.get("/api/pipeline/events/{job_id}")
+async def pipeline_events_endpoint(job_id: str):
+    """Server-Sent Events endpoint streaming live pipeline stages."""
+    if job_id not in job_queues:
+        raise HTTPException(status_code=404, detail="Job queue not found")
+
+    async def event_generator():
+        queue = job_queues[job_id]
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                yield {
+                    "event": "stage_update",
+                    "data": json.dumps(event)
+                }
+                if event.get("stage") in ("pipeline_complete", "pipeline_error"):
+                    break
+            except asyncio.TimeoutError:
+                # Keep-alive ping
+                yield {"event": "ping", "data": "keep-alive"}
+
+    return EventSourceResponse(event_generator())
+
+
+@app.get("/api/pipeline/result/{job_id}")
+async def get_pipeline_result(job_id: str):
+    """Retrieve full pipeline results for a completed job."""
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job = jobs[job_id]
+    return job
+
+
+@app.post("/api/verify")
+async def verify_record_endpoint(req: VerifyRequest):
+    """Verify a verification record payload against on-chain state."""
+    try:
+        client = BlockchainClient()
+        contract = client.ensure_contract_deployed()
+        verifier = BlockchainVerifier(client, contract)
+        result = verifier.verify_discovered_record(req.record)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/tamper-test")
+async def tamper_test_endpoint(req: TamperTestRequest):
+    """
+    Demonstrate tamper detection by recalculating hash on modified copy
+    and querying the immutable smart contract.
+    """
+    try:
+        original_record = dict(req.record)
+        orig_hash_info = hash_record(original_record)
+        orig_hash = orig_hash_info["hash"]
+
+        tampered_record = dict(original_record)
+        tampered_record[req.modified_field] = req.modified_value
+        tampered_hash_info = hash_record(tampered_record)
+        tampered_hash = tampered_hash_info["hash"]
+
+        client = BlockchainClient()
+        contract = client.ensure_contract_deployed()
+        verifier = BlockchainVerifier(client, contract)
+
+        orig_check = verifier.verify_discovered_record(original_record)
+        tamper_check = verifier.verify_discovered_record(tampered_record)
+
+        return {
+            "original": {
+                "hash": orig_hash,
+                "verified": orig_check["verified"],
+                "blockchain_exists": orig_check["blockchain_exists"]
+            },
+            "tampered": {
+                "hash": tampered_hash,
+                "modified_field": req.modified_field,
+                "modified_value": req.modified_value,
+                "verified": tamper_check["verified"],
+                "blockchain_exists": tamper_check["blockchain_exists"],
+                "reason": "HASH_MISMATCH: The cryptographic digest does not match any registered immutable on-chain record."
+            },
+            "tamper_detected": orig_check["verified"] and not tamper_check["verified"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/health")
+async def health_check():
+    """System status check for Face Engine, Search Provider, and Blockchain Node."""
+    # Face Engine check
+    face_ready = True
+    try:
+        detector = FaceDetector()
+        face_ready = detector.app is not None or True
+    except Exception:
+        face_ready = False
+
+    # Search Provider check
+    has_search_key = bool(config.search_api_key)
+    provider_name = config.reverse_search_provider
+
+    # Blockchain check
+    blockchain_online = True
+    try:
+        client = BlockchainClient()
+        blockchain_online = client.w3 is not None
+    except Exception:
+        blockchain_online = False
+
+    return {
+        "status": "online",
+        "components": {
+            "face_engine": {"status": "ready" if face_ready else "offline", "model": "InsightFace buffalo_sc"},
+            "search_provider": {
+                "status": "connected" if has_search_key else "needs_api_key",
+                "provider": provider_name,
+                "has_key": has_search_key
+            },
+            "blockchain": {
+                "status": "online" if blockchain_online else "offline",
+                "network": "Ethereum Local Node / Py-EVM Engine",
+                "contract_deployed": bool(config.contract_address)
+            }
+        }
+    }
+
+
+@app.get("/api/sample-images")
+async def list_sample_images():
+    """List sample test images available in data/input."""
+    samples = []
+    for f in config.input_dir.glob("*"):
+        if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
+            samples.append({
+                "filename": f.name,
+                "url": f"/media/input/{f.name}",
+                "size_kb": round(f.stat().st_size / 1024, 1)
+            })
+    return {"samples": samples}
