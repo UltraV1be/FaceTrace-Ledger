@@ -15,26 +15,33 @@ import { HowItWorksModal } from './components/HowItWorksModal';
 import { Footer } from './components/Footer';
 import { usePipeline } from './hooks/usePipeline';
 import { getFullMediaUrl } from './services/api';
-import { AlertTriangle, Sparkles, Database, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, RotateCcw, PlusCircle, ChevronDown, ChevronUp, Terminal, ShieldAlert, Ban } from 'lucide-react';
 
 export const App: React.FC = () => {
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   const {
     selectedFile,
     sampleFilename,
     isProcessing,
+    isCancelling,
+    isCancelled,
     stages,
     currentStageId,
     pipelineResult,
     errorMessage,
+    errorDetails,
     systemStatus,
     sampleImages,
     history,
     handleFileSelected,
     startPipeline,
+    cancelExecution,
+    restartExecution,
+    resetToNewInvestigation,
     clearHistory,
   } = usePipeline();
 
@@ -51,7 +58,7 @@ export const App: React.FC = () => {
     : '';
 
   return (
-    <div className="min-h-screen bg-forest-950 text-cream-100 flex flex-col justify-between selection:bg-pink selection:text-white">
+    <div className="min-h-screen bg-[#071F17] text-[#FAF7F0] flex flex-col justify-between selection:bg-[#F50064] selection:text-white">
       
       {/* Top Header */}
       <Header
@@ -78,32 +85,97 @@ export const App: React.FC = () => {
           />
         </section>
 
-        {/* Live Execution Monitor */}
-        {(isProcessing || pipelineResult || errorMessage) && (
+        {/* Live Execution Monitor with Stop & Restart Controls */}
+        {(isProcessing || pipelineResult || errorMessage || isCancelled) && (
           <section id="pipeline-progress-section" className="scroll-mt-20">
             <PipelineProgress
               stages={stages}
               currentStageId={currentStageId}
               isProcessing={isProcessing}
+              isCancelling={isCancelling}
+              isCancelled={isCancelled}
+              onStop={cancelExecution}
+              onRestart={restartExecution}
+              onNewInvestigation={resetToNewInvestigation}
             />
           </section>
         )}
 
-        {/* Error Notification Banner */}
+        {/* Error / Diagnostics Banner */}
         {errorMessage && (
-          <div className="p-6 bg-red-950 border-2 border-red-500 text-cream-100 font-mono shadow-brutal flex items-start space-x-4">
-            <AlertTriangle className="w-6 h-6 text-pink shrink-0 mt-0.5" />
-            <div>
-              <h4 className="font-bold text-pink uppercase text-sm">
-                EXECUTION ANOMALY DETECTED
-              </h4>
-              <p className="text-xs text-cream-200 mt-1 leading-relaxed">
-                {errorMessage}
-              </p>
-              <div className="mt-3 text-[11px] text-cream-300/70 border-t border-red-800/50 pt-2">
-                Tip: Verify that SEARCH_API_KEY is configured in your .env file or choose another image containing a clearly visible face.
+          <div className="p-6 bg-red-950/90 border-2 border-red-500 text-[#FAF7F0] font-mono shadow-brutal space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start space-x-3.5">
+                {isCancelled ? (
+                  <Ban className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6 text-[#F50064] shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <h4 className="font-bold text-[#F50064] uppercase text-sm flex items-center gap-2">
+                    <span>{isCancelled ? 'EXECUTION CANCELLED' : 'EXECUTION ANOMALY DETECTED'}</span>
+                    {errorDetails?.error_code && (
+                      <span className="px-2 py-0.5 bg-[#141414] text-[#FAF7F0] text-[10px] border border-red-400/40">
+                        {errorDetails.error_code}
+                      </span>
+                    )}
+                  </h4>
+                  <p className="text-xs text-[#EBE3D0] mt-1 leading-relaxed">
+                    {errorMessage}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  onClick={restartExecution}
+                  className="px-3 py-1.5 bg-[#F50064] text-white text-xs font-bold uppercase hover:bg-[#FF006E] transition flex items-center space-x-1 shadow-brutal-sm"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>RETRY</span>
+                </button>
+                <button
+                  onClick={resetToNewInvestigation}
+                  className="px-3 py-1.5 bg-white text-[#141414] text-xs font-bold uppercase hover:bg-[#FAF7F0] transition flex items-center space-x-1 shadow-brutal-sm"
+                >
+                  <PlusCircle className="w-3 h-3" />
+                  <span>NEW IMAGE</span>
+                </button>
               </div>
             </div>
+
+            {/* Expandable Technical Details */}
+            {errorDetails && (
+              <div className="border-t border-red-800/60 pt-3">
+                <button
+                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                  className="text-xs text-[#EBE3D0] hover:text-white flex items-center space-x-1.5 font-bold cursor-pointer"
+                >
+                  <Terminal className="w-3.5 h-3.5 text-[#F50064]" />
+                  <span>VIEW TECHNICAL DETAILS</span>
+                  {showTechnicalDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+
+                {showTechnicalDetails && (
+                  <div className="mt-2.5 p-3.5 bg-[#141414] border border-red-500/40 text-[11px] space-y-1.5 text-[#EBE3D0]">
+                    <div><span className="text-[#888888]">PROVIDER:</span> {errorDetails.provider || 'SerpApi'}</div>
+                    <div><span className="text-[#888888]">ENGINE:</span> {errorDetails.engine || 'Google Lens'}</div>
+                    {errorDetails.http_status && (
+                      <div><span className="text-[#888888]">HTTP STATUS:</span> <strong className="text-[#F50064]">{errorDetails.http_status}</strong></div>
+                    )}
+                    {errorDetails.technical_details && (
+                      <div>
+                        <span className="text-[#888888] block">DIAGNOSTIC PAYLOAD:</span>
+                        <pre className="mt-1 p-2 bg-[#071F17] text-[#00E599] text-[10px] overflow-x-auto border border-white/10">
+                          {JSON.stringify(errorDetails.technical_details, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -133,7 +205,7 @@ export const App: React.FC = () => {
               </section>
             )}
 
-            {/* 3. Discovered Web Candidates List */}
+            {/* 3. Discovered Candidates List with Social Badges */}
             {pipelineResult.candidates && pipelineResult.candidates.length > 0 && (
               <section id="search-results-section">
                 <SearchResults

@@ -2,13 +2,18 @@ import { PipelineResult, SystemStatus, VerificationRecord } from '../types/pipel
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-export async function uploadAndRunPipeline(file?: File, sampleFilename?: string): Promise<{ job_id: string; status: string; image_path: string }> {
+export async function uploadAndRunPipeline(
+  file?: File,
+  sampleFilename?: string,
+  requireSocialMedia: boolean = false
+): Promise<{ job_id: string; status: string; image_path: string }> {
   const formData = new FormData();
   if (file) {
     formData.append('image', file);
   } else if (sampleFilename) {
     formData.append('sample_filename', sampleFilename);
   }
+  formData.append('require_social_media', String(requireSocialMedia));
 
   const res = await fetch(`${API_BASE}/api/pipeline/run`, {
     method: 'POST',
@@ -18,6 +23,32 @@ export async function uploadAndRunPipeline(file?: File, sampleFilename?: string)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || 'Failed to start pipeline analysis');
+  }
+
+  return res.json();
+}
+
+export async function cancelPipeline(jobId: string): Promise<{ job_id: string; status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/api/pipeline/${jobId}/cancel`, {
+    method: 'POST',
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Failed to cancel pipeline');
+  }
+
+  return res.json();
+}
+
+export async function restartPipeline(jobId: string): Promise<{ job_id: string; previous_job_id: string; status: string; image_path: string }> {
+  const res = await fetch(`${API_BASE}/api/pipeline/${jobId}/restart`, {
+    method: 'POST',
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Failed to restart pipeline');
   }
 
   return res.json();
@@ -35,7 +66,7 @@ export function subscribeToPipelineEvents(
     try {
       const parsed = JSON.parse(e.data);
       onEvent(parsed);
-      if (parsed.stage === 'pipeline_complete' || parsed.stage === 'pipeline_error') {
+      if (parsed.stage === 'pipeline_complete' || parsed.stage === 'pipeline_error' || parsed.stage === 'pipeline_cancelled') {
         eventSource.close();
         onComplete();
       }
@@ -118,6 +149,21 @@ export async function getHealthStatus(): Promise<SystemStatus> {
   const res = await fetch(`${API_BASE}/api/health`);
   if (!res.ok) {
     throw new Error('Health check failed');
+  }
+  return res.json();
+}
+
+export async function getSearchDiagnostics(): Promise<{
+  provider: string;
+  engine: string;
+  configured: boolean;
+  api_key_loaded: boolean;
+  api_key_masked: string;
+  status: string;
+}> {
+  const res = await fetch(`${API_BASE}/api/diagnostics/search-provider`);
+  if (!res.ok) {
+    throw new Error('Search diagnostics failed');
   }
   return res.json();
 }

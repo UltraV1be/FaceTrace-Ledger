@@ -1,7 +1,7 @@
 """
 FastAPI Server for FaceTrace Ledger.
 Provides REST and Server-Sent Events (SSE) endpoints for real-time pipeline execution,
-blockchain verification, tamper testing, and candidate image serving with social media provenance.
+job cancellation, restart, blockchain verification, diagnostics, and tamper testing.
 """
 
 import sys
@@ -26,6 +26,7 @@ from src.face.detector import FaceDetector, FaceDetectionError
 from src.face.encoder import FaceEncoder, FaceEncodingError
 from src.face.matcher import FaceMatcher
 from src.search.reverse_search import ReverseImageSearchService
+from src.search.providers.serpapi_lens import SerpApiError, SerpApiLensProvider
 from src.search.result_parser import parse_search_results
 from src.search.candidate_downloader import CandidateDownloader
 from src.search.candidate_verifier import CandidateVerifier
@@ -39,7 +40,7 @@ from src.utils.helpers import save_json, load_json
 app = FastAPI(
     title="FaceTrace Ledger API",
     description="Forensic Biometric Search & Blockchain Verification API with Social Media Classification",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 # Enable CORS for local development
@@ -83,12 +84,23 @@ async def push_event(job_id: str, stage: str, status: str, message: str, data: O
         await job_queues[job_id].put(event_payload)
 
 
+def is_job_cancelled(job_id: str) -> bool:
+    """Check if cancellation was requested for this job."""
+    return jobs.get(job_id, {}).get("status") == "cancellation_requested"
+
+
 def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool = False):
-    """Synchronous worker running the full pipeline while broadcasting async events."""
+    """Synchronous worker running the full pipeline while broadcasting async events with cancellation checks."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
+        # Check cancellation
+        if is_job_cancelled(job_id):
+            jobs[job_id]["status"] = "cancelled"
+            loop.run_until_complete(push_event(job_id, "pipeline_cancelled", "cancelled", "Execution cancelled by user"))
+            return
+
         # Step 1: Loading image
         loop.run_until_complete(push_event(job_id, "image_loading", "processing", f"Loading image binary ({image_path.name})"))
         image_sha256 = hash_file(image_path)
@@ -98,13 +110,21 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             "image_url": f"/media/input/{image_path.name}"
         }))
 
+        if is_job_cancelled(job_id):
+            jobs[job_id]["status"] = "cancelled"
+            loop.run_until_complete(push_event(job_id, "pipeline_cancelled", "cancelled", "Execution cancelled by user"))
+            return
+
         # Step 2: Face Detection
         loop.run_until_complete(push_event(job_id, "face_detection", "processing", "Detecting frontal faces with InsightFace"))
         detector = FaceDetector()
         try:
             face_info = detector.detect_primary_face(image_path)
         except FaceDetectionError as e:
-            loop.run_until_complete(push_event(job_id, "face_detection", "failed", str(e)))
+            loop.run_until_complete(push_event(job_id, "face_detection", "failed", str(e), {
+                "error_code": "NO_FACE_DETECTED",
+                "error_details": str(e)
+            }))
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
             return
@@ -116,13 +136,21 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             "confidence": confidence
         }))
 
+        if is_job_cancelled(job_id):
+            jobs[job_id]["status"] = "cancelled"
+            loop.run_until_complete(push_event(job_id, "pipeline_cancelled", "cancelled", "Execution cancelled by user"))
+            return
+
         # Step 3: Face Encoding
         loop.run_until_complete(push_event(job_id, "face_encoding", "processing", "Extracting 512-d normalized face vector"))
         encoder = FaceEncoder(detector)
         try:
             input_embedding = encoder.encode(face_info)
         except FaceEncodingError as e:
-            loop.run_until_complete(push_event(job_id, "face_encoding", "failed", str(e)))
+            loop.run_until_complete(push_event(job_id, "face_encoding", "failed", str(e), {
+                "error_code": "ENCODING_FAILED",
+                "error_details": str(e)
+            }))
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
             return
@@ -132,29 +160,66 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             "ephemeral": True
         }))
 
-        # Step 4: Reverse Search
-        loop.run_until_complete(push_event(job_id, "reverse_search", "processing", f"Executing search query via {config.reverse_search_provider}"))
-        search_service = ReverseImageSearchService()
+        if is_job_cancelled(job_id):
+            jobs[job_id]["status"] = "cancelled"
+            loop.run_until_complete(push_event(job_id, "pipeline_cancelled", "cancelled", "Execution cancelled by user"))
+            return
+
+        # Step 4: Reverse Search with Diagnostic Tracing
+        loop.run_until_complete(push_event(job_id, "reverse_search", "processing", f"Optimizing image & querying Google Lens via {config.reverse_search_provider}"))
+        
+        search_provider = SerpApiLensProvider(config.search_api_key)
         try:
-            raw_results = search_service.search(image_path)
+            search_output = search_provider.search_with_trace(str(image_path))
+            raw_results = search_output["results"]
+            search_trace = search_output["trace"]
+        except SerpApiError as e:
+            err_payload = {
+                "error_code": e.code,
+                "error_message": e.message,
+                "http_status": e.http_status,
+                "technical_details": e.details,
+                "provider": "serpapi",
+                "engine": "google_lens"
+            }
+            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", e.message, err_payload))
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = e.message
+            jobs[job_id]["error_details"] = err_payload
+            return
         except Exception as e:
-            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", f"Search provider error: {e}"))
+            err_payload = {
+                "error_code": "SEARCH_PROVIDER_ERROR",
+                "error_message": str(e),
+                "http_status": None,
+                "technical_details": {"exception": str(e)},
+                "provider": "serpapi",
+                "engine": "google_lens"
+            }
+            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", f"Search error: {e}", err_payload))
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
+            jobs[job_id]["error_details"] = err_payload
             return
 
         parsed_candidates = parse_search_results(raw_results)
         social_count = sum(1 for c in parsed_candidates if c.get("is_social_media"))
 
-        loop.run_until_complete(push_event(job_id, "reverse_search", "success", f"Search completed ({len(raw_results)} results, {social_count} social)", {
+        loop.run_until_complete(push_event(job_id, "reverse_search", "success", f"Search completed ({len(raw_results)} matches, {social_count} social media)", {
             "results_found": len(raw_results),
             "social_media_count": social_count,
-            "provider": config.reverse_search_provider
+            "provider": config.reverse_search_provider,
+            "search_trace": search_trace
         }))
 
         if not raw_results:
             loop.run_until_complete(push_event(job_id, "candidate_verification", "failed", "No search results returned by provider"))
             jobs[job_id]["status"] = "no_match"
+            return
+
+        if is_job_cancelled(job_id):
+            jobs[job_id]["status"] = "cancelled"
+            loop.run_until_complete(push_event(job_id, "pipeline_cancelled", "cancelled", "Execution cancelled by user"))
             return
 
         # Step 5: Candidate Verification & Social Media Prioritization
@@ -167,7 +232,6 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             require_social_media=require_social_media
         )
 
-        # Format candidate image URLs for frontend display
         formatted_candidates = []
         for cand in evaluated_candidates:
             local_img = cand.get("candidate_local_image")
@@ -201,6 +265,11 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             "candidates": formatted_candidates
         }))
 
+        if is_job_cancelled(job_id):
+            jobs[job_id]["status"] = "cancelled"
+            loop.run_until_complete(push_event(job_id, "pipeline_cancelled", "cancelled", "Execution cancelled by user"))
+            return
+
         # Step 6: Canonical Record
         loop.run_until_complete(push_event(job_id, "canonical_record", "processing", "Constructing canonical JSON record with social provenance"))
         record = build_verification_record(
@@ -227,6 +296,11 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             "record_hash": record_hash,
             "canonical_payload": hash_info["canonical_payload"]
         }))
+
+        if is_job_cancelled(job_id):
+            jobs[job_id]["status"] = "cancelled"
+            loop.run_until_complete(push_event(job_id, "pipeline_cancelled", "cancelled", "Execution cancelled by user"))
+            return
 
         # Step 8: Blockchain Upload & Re-Verification
         loop.run_until_complete(push_event(job_id, "blockchain_upload", "processing", "Registering record on Ethereum smart contract"))
@@ -266,7 +340,8 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             "search": {
                 "provider": config.reverse_search_provider,
                 "results_found": len(raw_results),
-                "social_media_count": social_count
+                "social_media_count": social_count,
+                "search_trace": search_trace
             },
             "candidates": formatted_candidates,
             "best_match": best_candidate,
@@ -308,18 +383,11 @@ async def run_pipeline_endpoint(
     sample_filename: Optional[str] = Form(None),
     require_social_media: bool = Form(False)
 ):
-    """Initiate a new pipeline execution job with optional social media post requirement."""
+    """Initiate a new pipeline execution job with independent job ID."""
     job_id = str(uuid.uuid4())
     job_queues[job_id] = asyncio.Queue()
-    jobs[job_id] = {
-        "job_id": job_id,
-        "status": "processing",
-        "result": None,
-        "error": None
-    }
 
     if image and image.filename:
-        # Save uploaded image to data/input
         dest_path = config.input_dir / f"upload_{job_id[:8]}_{image.filename}"
         content = await image.read()
         with open(dest_path, "wb") as f:
@@ -331,14 +399,65 @@ async def run_pipeline_endpoint(
             raise HTTPException(status_code=404, detail=f"Sample image '{sample_filename}' not found.")
         target_path = sample_path
     else:
-        # Default fallback to lena.jpg or sample_portrait.jpg
         fallback = config.input_dir / "lena.jpg"
         if not fallback.exists():
             fallback = config.input_dir / "sample_portrait.jpg"
         target_path = fallback
 
+    jobs[job_id] = {
+        "job_id": job_id,
+        "status": "processing",
+        "image_path": str(target_path),
+        "require_social_media": require_social_media,
+        "result": None,
+        "error": None
+    }
+
     background_tasks.add_task(run_pipeline_sync, job_id, target_path, require_social_media)
     return {"job_id": job_id, "status": "initialized", "image_path": str(target_path.name)}
+
+
+@app.post("/api/pipeline/{job_id}/cancel")
+async def cancel_pipeline_endpoint(job_id: str):
+    """Request immediate cancellation of a running pipeline job."""
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if jobs[job_id]["status"] in ("completed", "failed", "cancelled"):
+        return {"job_id": job_id, "status": jobs[job_id]["status"], "message": "Job already terminated"}
+
+    jobs[job_id]["status"] = "cancellation_requested"
+    await push_event(job_id, "pipeline_cancelled", "cancelled", "Cancellation requested by user")
+    return {"job_id": job_id, "status": "cancellation_requested", "message": "Pipeline cancellation signal sent"}
+
+
+@app.post("/api/pipeline/{job_id}/restart")
+async def restart_pipeline_endpoint(job_id: str, background_tasks: BackgroundTasks):
+    """Restart a previous job using its stored image under a brand new job ID."""
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Original job not found")
+
+    old_job = jobs[job_id]
+    image_path_str = old_job.get("image_path")
+    if not image_path_str or not Path(image_path_str).exists():
+        raise HTTPException(status_code=400, detail="Original image file no longer available on server")
+
+    target_path = Path(image_path_str)
+    require_social = old_job.get("require_social_media", False)
+
+    new_job_id = str(uuid.uuid4())
+    job_queues[new_job_id] = asyncio.Queue()
+    jobs[new_job_id] = {
+        "job_id": new_job_id,
+        "status": "processing",
+        "image_path": str(target_path),
+        "require_social_media": require_social,
+        "result": None,
+        "error": None
+    }
+
+    background_tasks.add_task(run_pipeline_sync, new_job_id, target_path, require_social)
+    return {"job_id": new_job_id, "previous_job_id": job_id, "status": "initialized", "image_path": target_path.name}
 
 
 @app.get("/api/pipeline/events/{job_id}")
@@ -356,10 +475,9 @@ async def pipeline_events_endpoint(job_id: str):
                     "event": "stage_update",
                     "data": json.dumps(event)
                 }
-                if event.get("stage") in ("pipeline_complete", "pipeline_error"):
+                if event.get("stage") in ("pipeline_complete", "pipeline_error", "pipeline_cancelled"):
                     break
             except asyncio.TimeoutError:
-                # Keep-alive ping
                 yield {"event": "ping", "data": "keep-alive"}
 
     return EventSourceResponse(event_generator())
@@ -370,8 +488,7 @@ async def get_pipeline_result(job_id: str):
     """Retrieve full pipeline results for a completed job."""
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
-    return job
+    return jobs[job_id]
 
 
 @app.post("/api/verify")
@@ -389,10 +506,7 @@ async def verify_record_endpoint(req: VerifyRequest):
 
 @app.post("/api/tamper-test")
 async def tamper_test_endpoint(req: TamperTestRequest):
-    """
-    Demonstrate tamper detection by recalculating hash on modified copy
-    and querying the immutable smart contract.
-    """
+    """Demonstrate tamper detection by recalculating hash on modified copy and querying smart contract."""
     try:
         original_record = dict(req.record)
         orig_hash_info = hash_record(original_record)
@@ -430,10 +544,26 @@ async def tamper_test_endpoint(req: TamperTestRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/diagnostics/search-provider")
+async def search_provider_diagnostics():
+    """Detailed diagnostics for the reverse-image search provider without exposing secrets."""
+    provider = SerpApiLensProvider(config.search_api_key)
+    has_key = bool(provider.api_key)
+    return {
+        "provider": "serpapi",
+        "engine": "google_lens",
+        "configured": has_key,
+        "api_key_loaded": has_key,
+        "api_key_masked": provider.get_masked_key(),
+        "upload_endpoint": provider.UPLOAD_ENDPOINT,
+        "search_endpoint": provider.SEARCH_ENDPOINT,
+        "status": "READY" if has_key else "MISSING_API_KEY"
+    }
+
+
 @app.get("/api/health")
 async def health_check():
     """System status check for Face Engine, Search Provider, and Blockchain Node."""
-    # Face Engine check
     face_ready = True
     try:
         detector = FaceDetector()
@@ -441,11 +571,9 @@ async def health_check():
     except Exception:
         face_ready = False
 
-    # Search Provider check
-    has_search_key = bool(config.search_api_key)
-    provider_name = config.reverse_search_provider
+    provider = SerpApiLensProvider(config.search_api_key)
+    has_search_key = bool(provider.api_key)
 
-    # Blockchain check
     blockchain_online = True
     try:
         client = BlockchainClient()
@@ -459,8 +587,9 @@ async def health_check():
             "face_engine": {"status": "ready" if face_ready else "offline", "model": "InsightFace buffalo_sc"},
             "search_provider": {
                 "status": "connected" if has_search_key else "needs_api_key",
-                "provider": provider_name,
-                "has_key": has_search_key
+                "provider": config.reverse_search_provider,
+                "has_key": has_search_key,
+                "api_key_masked": provider.get_masked_key()
             },
             "blockchain": {
                 "status": "online" if blockchain_online else "offline",
@@ -476,7 +605,7 @@ async def list_sample_images():
     """List sample test images available in data/input."""
     samples = []
     for f in config.input_dir.glob("*"):
-        if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
+        if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp") and not f.name.startswith("upload_"):
             samples.append({
                 "filename": f.name,
                 "url": f"/media/input/{f.name}",
