@@ -135,7 +135,7 @@ flowchart TD
 ```
 +-----------------------------------------------------------------------------------+
 | [SEARCH] [search_20260902_43faae] Preparing reverse-image request                 |
-| [SEARCH] Image optimized: 2589.6 KB -> 14.6 KB (531x396 px, Q=25)                |
+| [SEARCH] Image optimized: 2589.6 KB -> 14.6 KB (531x396 px, Q=25)                 |
 | [SEARCH] Provider: SerpApi | Engine: Google Lens                                  |
 | [SEARCH] Request sent -> HTTP 200 OK                                              |
 | [SEARCH] Results parsed: 60 visual matches (16 social media candidates)           |
@@ -249,7 +249,7 @@ The frontend is built using **React 18 + TypeScript + Vite + Tailwind CSS v4** a
 |  CONTROLS:  [ STOP EXECUTION ]   [ RESTART TRACE ]   [ NEW INVESTIGATION ]            |
 |                                                                                       |
 |  ===================================================================================  |
-|  [A] INPUT SUBJECT ARTIFACT            |  [B] DISCOVERED REDDIT POST MATCH           |
+|  [A] INPUT SUBJECT ARTIFACT            |  [B] DISCOVERED REDDIT POST MATCH            |
 |  Image: lena.jpg                       |  Platform: REDDIT | Result: SOCIAL_MEDIA_POST|
 |  SHA-256: 7de7ed51...                  |  Title: lena.jpg now : r/programming         |
 |  Face: 512-D Normalized Vector         |  Similarity: 93.78% (Threshold: 65.0%)       |
@@ -295,10 +295,10 @@ The frontend is built using **React 18 + TypeScript + Vite + Tailwind CSS v4** a
                                       (Smart Contract Lookup)
                                                │
                                                ▼
-                            ╔══════════════════════════════════════╗
-                            ║ [FAILED] HASH_MISMATCH               ║
+                            ╔═══════════════════════════════════════╗
+                            ║ [FAILED] HASH_MISMATCH                ║
                             ║ SECURITY ALERT: DATA HAS BEEN TAMPERED║
-                            ╚══════════════════════════════════════╝
+                            ╚═══════════════════════════════════════╝
 ```
 
 Any discrepancy between the local record and the on-chain fingerprint guarantees **100% mathematical detection of data corruption or tampering**.
@@ -481,32 +481,32 @@ pytest -v
 
 ### Test Suite Execution Output
 ```
-tests/test_blockchain.py::test_blockchain_register_and_verify PASSED          [  2%]
-tests/test_blockchain.py::test_blockchain_tamper_detection PASSED             [  4%]
+tests/test_blockchain.py::test_blockchain_register_and_verify PASSED              [  2%]
+tests/test_blockchain.py::test_blockchain_tamper_detection PASSED                 [  4%]
 tests/test_blockchain.py::test_blockchain_duplicate_registration_rejection PASSED [  6%]
-tests/test_face.py::test_cosine_similarity_identical PASSED                   [  8%]
-tests/test_face.py::test_cosine_similarity_orthogonal PASSED                  [ 10%]
-tests/test_face.py::test_face_matcher_threshold PASSED                        [ 12%]
-tests/test_face.py::test_invalid_image_load PASSED                            [ 14%]
-tests/test_face.py::test_face_encoding_dimension PASSED                       [ 17%]
-tests/test_hashing.py::test_hash_string_deterministic PASSED                  [ 19%]
-tests/test_hashing.py::test_hash_string_collision_resistance PASSED           [ 21%]
-tests/test_hashing.py::test_hash_record_deterministic PASSED                  [ 23%]
-tests/test_hashing.py::test_hash_record_tamper_detection PASSED               [ 25%]
-tests/test_hashing.py::test_bytes32_conversion_roundtrip PASSED               [ 27%]
-tests/test_hashing.py::test_bytes32_conversion_with_0x_prefix PASSED          [ 29%]
-tests/test_hashing.py::test_bytes32_conversion_invalid_length PASSED          [ 31%]
-tests/test_pipeline_e2e.py::test_full_pipeline_end_to_end PASSED              [ 34%]
-tests/test_record.py::test_canonicalize_reordered_keys PASSED                 [ 36%]
-tests/test_record.py::test_build_verification_record_valid PASSED             [ 38%]
-tests/test_record.py::test_build_verification_record_invalid_sha256 PASSED   [ 40%]
-tests/test_search.py::test_url_validation PASSED                              [ 42%]
-tests/test_search.py::test_domain_extraction PASSED                           [ 44%]
-tests/test_search.py::test_parse_search_results_deduplication PASSED          [ 46%]
-tests/test_search.py::test_provider_factory_registration PASSED               [ 48%]
-tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_masked_key PASSED [ 51%]
-tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_missing_api_key_raises_auth_error PASSED [ 53%]
-tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_image_optimization_under_limit PASSED [ 55%]
+tests/test_face.py::test_cosine_similarity_identical PASSED                       [  8%]
+tests/test_face.py::test_cosine_similarity_orthogonal PASSED                      [ 10%]
+tests/test_face.py::test_face_matcher_threshold PASSED                            [ 12%]
+tests/test_face.py::test_invalid_image_load PASSED                                [ 14%]
+tests/test_face.py::test_face_encoding_dimension PASSED                           [ 17%]
+tests/test_hashing.py::test_hash_string_deterministic PASSED                      [ 19%]
+tests/test_hashing.py::test_hash_string_collision_resistance PASSED               [ 21%]
+tests/test_hashing.py::test_hash_record_deterministic PASSED                      [ 23%]
+tests/test_hashing.py::test_hash_record_tamper_detection PASSED                   [ 25%]
+tests/test_hashing.py::test_bytes32_conversion_roundtrip PASSED                   [ 27%]
+tests/test_hashing.py::test_bytes32_conversion_with_0x_prefix PASSED              [ 29%]
+tests/test_hashing.py::test_bytes32_conversion_invalid_length PASSED              [ 31%]
+tests/test_pipeline_e2e.py::test_full_pipeline_end_to_end PASSED                  [ 34%]
+tests/test_record.py::test_canonicalize_reordered_keys PASSED                     [ 36%]
+tests/test_record.py::test_build_verification_record_valid PASSED                 [ 38%]
+tests/test_record.py::test_build_verification_record_invalid_sha256 PASSED        [ 40%]
+tests/test_search.py::test_url_validation PASSED                                  [ 42%]
+tests/test_search.py::test_domain_extraction PASSED                               [ 44%]
+tests/test_search.py::test_parse_search_results_deduplication PASSED              [ 46%]
+tests/test_search.py::test_provider_factory_registration PASSED                   [ 48%]
+tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_masked_key PASSED   [ 51%]
+tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_missing_api_key_raises_auth_error PASSED          [ 53%]
+tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_image_optimization_under_limit PASSED             [ 55%]
 tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_nonexistent_image_raises PASSED [ 57%]
 tests/test_social_media_classification.py::TestSocialMediaClassification::test_instagram_post PASSED [ 59%]
 tests/test_social_media_classification.py::TestSocialMediaClassification::test_instagram_reel PASSED [ 61%]
