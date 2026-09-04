@@ -1,214 +1,402 @@
-# FaceTrace Ledger
+# 👁️‍🗨️ FaceTrace Ledger
+### *AI Biometric Discovery, Social Media Provenance & Immutable Blockchain Verification Lab*
 
-**Face Search + Cryptographic Hashing + Immutable Blockchain Verification Pipeline**
-
----
-
-## 1. Project Overview
-
-**FaceTrace Ledger** is an end-to-end, production-grade security and computer vision pipeline designed for consent-based biometric discovery, provenance validation, and tamper-evident auditability.
-
-The system takes an input photograph containing a human face, performs neural face detection and 512-dimensional normalized embedding generation, executes genuine dynamic reverse-image search across public web sources, downloads and verifies candidate faces via cosine similarity comparison, constructs a canonical audit record, generates a SHA-256 cryptographic fingerprint, registers the hash on an Ethereum smart contract, and performs cryptographic re-verification to detect any data tampering.
-
----
-
-## 2. Competition Problem Interpretation
-
-In digital forensics, intellectual property protection, and biometric auditability, establishing the provenance of public media while guaranteeing privacy is a critical challenge.
-
-1. **Genuine Dynamic Search**: Unlike mock systems that hardcode results or map filenames to predefined URLs, FaceTrace Ledger queries legitimate reverse search APIs directly using the binary payload and cryptographic fingerprint of the user's input image.
-2. **Privacy-Preserving Biometric Architecture**: Biometric embeddings and face photographs are **NEVER stored on-chain or persisted in public databases**. Only deterministic cryptographic hashes (SHA-256) of structured verification records and audit timestamps are immutably anchored on-chain.
-3. **Mathematical Tamper-Evidence**: Any post-registration modification to candidate provenance, similarity scores, or source URLs changes the canonical JSON serialization, producing a hash mismatch that immediately fails blockchain re-verification.
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.14-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18%20(Vite%20%2B%20TS)-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636?style=for-the-badge&logo=solidity&logoColor=white)](https://soliditylang.org)
+[![Web3.py](https://img.shields.io/badge/Web3.py-v6-F16822?style=for-the-badge&logo=ethereum&logoColor=white)](https://web3py.readthedocs.io)
+[![Tests](https://img.shields.io/badge/Tests-47%20Passed%20(100%25)-00E599?style=for-the-badge&logo=pytest&logoColor=white)](https://pytest.org)
+[![License](https://img.shields.io/badge/License-MIT-F50064?style=for-the-badge)](LICENSE)
 
 ---
 
-## 3. Architecture
+## 📑 Table of Contents
+
+- [1. Executive Overview](#1-executive-overview)
+- [2. System Architecture & Forensic Flow](#2-system-architecture--forensic-flow)
+- [3. Core Technical Pillars & How It Works](#3-core-technical-pillars--how-it-works)
+  - [Stage 01: Input Evidence Acquisition](#stage-01-input-evidence-acquisition)
+  - [Stage 02: Neural Face Detection & Alignment](#stage-02-neural-face-detection--alignment)
+  - [Stage 03: Ephemeral 512-D Biometric Encoding](#stage-03-ephemeral-512-d-biometric-encoding)
+  - [Stage 04: Reverse Image Search Engine with Auto-Optimization](#stage-04-reverse-image-search-engine-with-auto-optimization)
+  - [Stage 05: Social Media Classification & Priority Verification](#stage-05-social-media-classification--priority-verification)
+  - [Stage 06: RFC-8785 Canonical Record Fingerprinting](#stage-06-rfc-8785-canonical-record-fingerprinting)
+  - [Stage 07: Immutable Ethereum Smart Contract Registration](#stage-07-immutable-ethereum-smart-contract-registration)
+- [4. Interactive Full-Stack Web Application](#4-interactive-full-stack-web-application)
+- [5. Tamper Detection Sandbox & Mathematical Security](#5-tamper-detection-sandbox--mathematical-security)
+- [6. Repository Structure](#6-repository-structure)
+- [7. Quickstart & Installation](#7-quickstart--installation)
+- [8. CLI & API Reference](#8-cli--api-reference)
+- [9. Automated Test Suite](#9-automated-test-suite)
+- [10. Privacy & Ethics Philosophy](#10-privacy--ethics-philosophy)
+
+---
+
+## 1. Executive Overview
+
+**FaceTrace Ledger** is an enterprise-grade biometric discovery, open-source intelligence (OSINT) provenance analysis, and tamper-evident cryptographic audit platform.
+
+In digital forensics, intellectual property protection, and biometric auditability, identifying whether a portrait image appears publicly on the web while proving provenance without violating subject privacy has historically been a critical challenge.
+
+```
+       ┌──────────────────┐               ┌───────────────────┐               ┌──────────────────┐
+       │   INPUT IMAGE    │ ────────────> │  BIOMETRIC SEARCH │ ────────────> │ CANONICAL RECORD │
+       │ (User Upload/CV) │               │   & VERIFICATION  │               │   (RFC-8785 JSON)│
+       └──────────────────┘               └───────────────────┘               └─────────┬────────┘
+                                                                                        │
+                                                                                        ▼
+       ┌──────────────────┐               ┌───────────────────┐               ┌──────────────────┐
+       │ TAMPER DETECTION │ <──────────── │  RE-VERIFICATION  │ <──────────── │ BLOCKCHAIN MINED │
+       │ (Hash Mismatch)  │               │ (On-Chain Lookup) │               │ (Smart Contract) │
+       └──────────────────┘               └───────────────────┘               └──────────────────┘
+```
+
+### ✨ Key Innovations
+
+1. **Genuine Dynamic Reverse Search**: No hardcoded mocks. Uploaded photos are dynamically optimized and queried against Google Lens via SerpApi.
+2. **Post-Level Social Media Classification & Prioritization**: Differentiates `SOCIAL_MEDIA_POST`, `SOCIAL_MEDIA_PROFILE`, `SOCIAL_MEDIA_PAGE`, and `GENERAL_WEB_RESULT` across 9 platforms (Instagram, X, Reddit, TikTok, LinkedIn, Pinterest, Facebook, Threads, YouTube), prioritizing actual social posts for verification.
+3. **Zero-Biometric On-Chain Footprint**: Biometric vectors and facial images are **never stored on the blockchain or persisted in public databases**. Only deterministic SHA-256 digests of structured provenance records are anchored on-chain.
+4. **Mathematical Tamper Evidence**: Changing a single comma, URL, social platform tag, or similarity score alters the canonical SHA-256 fingerprint and causes immediate on-chain verification failure.
+5. **Production-Ready Full-Stack Experience**: High-contrast, brutalist editorial UI with live Server-Sent Events (SSE), Stop Execution, Restart Execution, Reset to New Investigation, Tamper Simulator, and Forensic PDF/JSON/CSV exports.
+
+---
+
+## 2. System Architecture & Forensic Flow
 
 ```mermaid
 flowchart TD
+    subgraph S1["1. ACQUISITION & BIOMETRICS"]
+        A["Input Portrait Image"] -->|"SHA-256 Digest"| B["InsightFace Buffalo_SC"]
+        B -->|"Bounding Box & Landmarks"| C["512-D Normalized Vector"]
+        C -->|"Ephemeral State"| D["Memory Cache (Privacy Safe)"]
+    end
 
-    A[Input Face Image]
-    --> B[Face Detection]
+    subgraph S2["2. DYNAMIC SEARCH & SOCIAL ENGINE"]
+        A -->|"Auto-Optimize <=450KB"| E["SerpApi Lens Provider"]
+        E -->|"HTTP 200 (search_id)"| F["Raw Visual Matches (50-60)"]
+        F --> G["Social Media URL Classifier"]
+        G -->|"Sort by Priority"| H["Candidate Queue"]
+        H -->|"1. SOCIAL_MEDIA_POST\n2. SOCIAL_MEDIA_PROFILE\n3. SOCIAL_MEDIA_PAGE\n4. GENERAL_WEB"| I["Candidate Image Downloader"]
+    end
 
-    B --> C[Face Encoding]
+    subgraph S3["3. COMPARISON & VERIFICATION"]
+        I --> J["InsightFace Biometric Matching"]
+        D -.->|"Cosine Similarity"| J
+        J --> K{"Cosine Score >= 0.65?"}
+        K -->|"No"| L["Honest NO_MATCH Status"]
+        K -->|"Yes"| M["Best Verified Social Match"]
+    end
 
-    C --> D[Dynamic Reverse Image Search]
+    subgraph S4["4. CANONICAL RECORD & FINGERPRINT"]
+        M --> N["Build Verification Record"]
+        N --> O["RFC-8785 Canonical JSON"]
+        O --> P["SHA-256 Cryptographic Hash"]
+    end
 
-    D --> E[Real Web Search Results]
+    subgraph S5["5. IMMUTABLE BLOCKCHAIN LEDGER"]
+        P --> Q["Solidity Smart Contract (RecordLedger.sol)"]
+        Q --> R["Ethereum Mined Block (Tx Hash, Block #)"]
+        R --> S["On-Chain Re-Verification Query"]
+        S --> T{"Record Exists & Hash Matches?"}
+        T -->|"Yes"| U["[OK] VERIFIED ON-CHAIN"]
+        T -->|"No / Modified"| V["[ALERT] TAMPERING DETECTED"]
+    end
 
-    E --> F[Candidate Face Verification]
-
-    F --> G{Candidate Passes Threshold?}
-
-    G -->|No| H[No Verified Match]
-
-    G -->|Yes| I[Build Verification Record]
-
-    I --> J[Canonical JSON]
-
-    J --> K[SHA-256 Hash]
-
-    K --> L[Blockchain Registration]
-
-    L --> M[On-Chain Record]
-
-    M --> N[Recompute Current Hash]
-
-    N --> O[Blockchain Verification]
-
-    O --> P{Hashes Match?}
-
-    P -->|Yes| Q[Verified]
-
-    P -->|No| R[Tampering Detected]
+    style S1 fill:#0A2E23,stroke:#00E599,stroke-width:2px,color:#FAF7F0
+    style S2 fill:#071F17,stroke:#F50064,stroke-width:2px,color:#FAF7F0
+    style S3 fill:#141414,stroke:#00E599,stroke-width:2px,color:#FAF7F0
+    style S4 fill:#0A2E23,stroke:#F50064,stroke-width:2px,color:#FAF7F0
+    style S5 fill:#071F17,stroke:#00E599,stroke-width:2px,color:#FAF7F0
 ```
 
 ---
 
-## 4. Technology Stack
+## 3. Core Technical Pillars & How It Works
 
-- **Programming Language**: Python 3.11+ / 3.12+ / 3.14+
-- **Face Recognition & Vision**: InsightFace (`buffalo_sc`), ONNX Runtime, OpenCV, Pillow, NumPy
-- **Web Requests & Scraping**: `requests`, `urllib3`, `beautifulsoup4`
-- **Blockchain**: Ethereum / EVM Compatible (`Ganache`, `Hardhat`, `Anvil`, `Py-EVM / eth-tester`)
-- **Smart Contract**: Solidity `^0.8.20`
-- **Web3 Integration**: `web3.py`, `eth-account`, `py-solc-x`
-- **Cryptography**: Python `hashlib` (SHA-256), `hexbytes`, deterministic RFC-8785 style canonicalization
-- **Configuration & CLI**: `python-dotenv`, `argparse`
-- **Testing**: `pytest`
+### Stage 01: Input Evidence Acquisition
+- **File Ingestion**: Accepts JPG, PNG, WEBP local uploads or sample portraits.
+- **Cryptographic Fingerprinting**: Immediately computes the input image's raw SHA-256 hash (NIST FIPS 180-4) to guarantee binary immutability from the first millisecond.
+
+### Stage 02: Neural Face Detection & Alignment
+- **Model**: InsightFace `buffalo_sc` (500M ResNet detection model).
+- **Processing**: Detects facial bounding box `[x1, y1, x2, y2]`, detection confidence, and 5-point facial landmark coordinates (left eye, right eye, nose tip, left mouth, right mouth) with affine transformation alignment.
+
+### Stage 03: Ephemeral 512-D Biometric Encoding
+- **Embedding Extraction**: Extracts a 512-dimensional normalized unit vector ($L_2$ norm = 1.0) using the `w600k_mbf` neural recognition backbone.
+- **Zero-Persistence Guarantee**: The embedding exists only in volatile memory during pipeline execution. It is never logged, never saved to disk, and never stored on-chain.
+
+### Stage 04: Reverse Image Search Engine with Auto-Optimization
+- **In-Memory Image Optimization**: High-resolution camera photos (2MB to 10MB) are automatically resized and compressed in-memory via OpenCV to under 450KB (complying strictly with SerpApi's 500KB ceiling) without degrading facial features.
+- **Request Tracing & Diagnostics**: Every reverse search generates a unique `search_request_id` (e.g. `search_20260902_43faae`) and logs the full lifecycle with masked credentials (`96d5****fab8`).
+- **Transient Retry Mechanism**: Built-in exponential backoff automatically retries network timeouts and 5xx errors up to 2 times without retrying client 4xx configuration errors.
+
+```
++-----------------------------------------------------------------------------------+
+| [SEARCH] [search_20260902_43faae] Preparing reverse-image request                 |
+| [SEARCH] Image optimized: 2589.6 KB -> 14.6 KB (531x396 px, Q=25)                |
+| [SEARCH] Provider: SerpApi | Engine: Google Lens                                  |
+| [SEARCH] Request sent -> HTTP 200 OK                                              |
+| [SEARCH] Results parsed: 60 visual matches (16 social media candidates)           |
++-----------------------------------------------------------------------------------+
+```
+
+### Stage 05: Social Media Classification & Priority Verification
+The system classifies all candidate URLs into 4 distinct types across 9 major platforms:
+
+| Platform | Domain Identifier | Post Regex / Identifier | Result Type |
+| :--- | :--- | :--- | :--- |
+| **Instagram** | `instagram.com` | `/p/`, `/reel/`, `/reels/`, `/tv/` | `SOCIAL_MEDIA_POST` |
+| **X (Twitter)** | `x.com`, `twitter.com` | `/[user]/status/[id]` | `SOCIAL_MEDIA_POST` |
+| **Reddit** | `reddit.com` | `/r/[sub]/comments/[id]/...` | `SOCIAL_MEDIA_POST` |
+| **TikTok** | `tiktok.com` | `/@ [user]/video/[id]` | `SOCIAL_MEDIA_POST` |
+| **LinkedIn** | `linkedin.com` | `/posts/`, `/feed/update/`, `/pulse/` | `SOCIAL_MEDIA_POST` |
+| **Pinterest** | `pinterest.com` | `/pin/[id]/` | `SOCIAL_MEDIA_POST` |
+| **Facebook** | `facebook.com` | `/posts/`, `/photo.php`, `/permalink.php` | `SOCIAL_MEDIA_POST` |
+| **Threads** | `threads.net` | `/@ [user]/post/[id]` | `SOCIAL_MEDIA_POST` |
+| **YouTube** | `youtube.com` | `/watch?v=...`, `/shorts/...` | `SOCIAL_MEDIA_POST` |
+
+#### Candidate Prioritization Queue
+Candidate URLs are sorted with strict priority:
+$$\text{Priority } 1: \text{SOCIAL\_MEDIA\_POST} \longrightarrow \text{Priority } 2: \text{SOCIAL\_MEDIA\_PROFILE} \longrightarrow \text{Priority } 3: \text{SOCIAL\_MEDIA\_PAGE} \longrightarrow \text{Priority } 4: \text{GENERAL\_WEB\_RESULT}$$
+
+Each candidate thumbnail is downloaded safely with MIME/size validations, faces are detected and aligned, and Cosine Similarity is calculated:
+$$\text{Similarity}(u, v) = \frac{u \cdot v}{\|u\|_2 \|v\|_2} \ge 0.65$$
+
+### Stage 06: RFC-8785 Canonical Record Fingerprinting
+When a candidate matches, a canonical verification record is constructed:
+
+```json
+{
+  "candidate_image_sha256": "232703645b370c8eb5456c2befc126f95fb3aa3da338914faa020ac44c49bf8e",
+  "image_sha256": "7de7ed51a1594fff247f4cae2301eceacf5313d6011e37b4a4c8733f7bb72c07",
+  "is_social_media": true,
+  "record_version": "1.0",
+  "result_title": "lena.jpg now : r/programming",
+  "result_type": "SOCIAL_MEDIA_POST",
+  "search_provider": "serpapi_lens",
+  "similarity_score": 0.9378,
+  "similarity_threshold": 0.65,
+  "social_platform": "reddit",
+  "source_domain": "reddit.com",
+  "source_url": "https://www.reddit.com/r/programming/comments/dobz8s/lenajpg_now/",
+  "verified_at": "2026-09-02T06:26:22.486015+00:00"
+}
+```
+
+- **Deterministic Canonicalization**: Serialized with sorted keys (`sort_keys=True`) and minimal separators (`,`, `:`) without whitespace variations.
+- **SHA-256 Digest**: Generates a 64-character hex string representing the mathematical seal of this exact forensic discovery.
+
+### Stage 07: Immutable Ethereum Smart Contract Registration
+The fingerprint is converted to `bytes32` and registered on an Ethereum smart contract:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract FaceTraceVerification {
+    struct VerificationRecord {
+        bytes32 recordHash;
+        uint256 timestamp;
+        address submitter;
+        bool exists;
+    }
+
+    mapping(bytes32 => VerificationRecord) public records;
+    bytes32[] public allRecordHashes;
+
+    event RecordRegistered(bytes32 indexed recordHash, address indexed submitter, uint256 timestamp);
+
+    function registerRecord(bytes32 _recordHash) external returns (bool) {
+        require(_recordHash != bytes32(0), "Invalid zero hash");
+        require(!records[_recordHash].exists, "Record hash already registered");
+
+        records[_recordHash] = VerificationRecord({
+            recordHash: _recordHash,
+            timestamp: block.timestamp,
+            submitter: msg.sender,
+            exists: true
+        });
+
+        allRecordHashes.push(_recordHash);
+        emit RecordRegistered(_recordHash, msg.sender, block.timestamp);
+        return true;
+    }
+
+    function verifyRecord(bytes32 _recordHash) external view returns (bool exists, uint256 timestamp, address submitter) {
+        VerificationRecord memory rec = records[_recordHash];
+        return (rec.exists, rec.timestamp, rec.submitter);
+    }
+}
+```
 
 ---
 
-## 5. Reverse-Image Search Provider Evaluation (Phase 0)
+## 4. Interactive Full-Stack Web Application
 
-| Provider | Authentication Required | Image Upload Supported | Returns Dynamic Results | Returns URLs & Titles | Cost / Free Tier | Reliability | Selected Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **SerpApi (Google Lens API)** | Yes (`api_key`) | **Yes** (`POST /image` returning `image_id`) | **Yes** (Real-time Lens engine) | **Yes** (`visual_matches` with URL, domain, title, thumbnail) | 100 free searches/mo | ⭐⭐⭐⭐⭐ Highest | **PRIMARY (Selected)** |
-| **Bing Visual Search API** | Yes (`Ocp-Apim-Subscription-Key`) | **Yes** (Multipart form `POST /v7.0/images/visualsearch`) | **Yes** (Bing Visual Graph) | **Yes** (`tags` -> `actions` -> `data.value`) | Azure F0 Free Tier (1k calls/mo) | ⭐⭐⭐⭐ High | **SECONDARY (Supported)** |
-| **SearchApi.io (Google Lens)** | Yes (`api_key`) | **Yes** (Direct upload / URL) | **Yes** | **Yes** | 100 free requests | ⭐⭐⭐⭐ High | **FALLBACK (Supported)** |
+The frontend is built using **React 18 + TypeScript + Vite + Tailwind CSS v4** adhering to the high-contrast, brutalist Hacker House Goa editorial aesthetic (*Forest Green `#0A2E23`, Warm Cream `#F5F0E3`, Hot Pink `#F50064`, Charcoal `#141414`*).
 
-### Selection Rationale: SerpApi Google Lens
-1. **Direct Image Upload**: Accepts raw image bytes via `https://serpapi.com/image` returning a temporary `image_id`, then queries Google Lens with `engine=google_lens&image_id=...`. This allows local images to be searched directly without requiring cloud hosting.
-2. **Comprehensive Metadata**: Returns public webpage links, titles, domain sources, and candidate image URLs in a structured `visual_matches` array.
-3. **Pluggable Architecture**: Implemented under `src/search/providers/` via `ReverseSearchProvider` interface and `SearchProviderFactory`.
+```
++---------------------------------------------------------------------------------------+
+|  FACETRACE LEDGER  //  AI BIOMETRIC DISCOVERY & BLOCKCHAIN VERIFICATION LAB           |
++---------------------------------------------------------------------------------------+
+|                                                                                       |
+|  [ STAGE 01: ACQUIRE ] ──> [ STAGE 02: DETECT ] ──> [ STAGE 03: ENCODE ]              |
+|  [ STAGE 04: SEARCH  ] ──> [ STAGE 05: COMPARE ] ──> [ STAGE 06: DIGEST ]             |
+|  [ STAGE 07: LEDGER  ]                                                                |
+|                                                                                       |
+|  CONTROLS:  [ STOP EXECUTION ]   [ RESTART TRACE ]   [ NEW INVESTIGATION ]            |
+|                                                                                       |
+|  ===================================================================================  |
+|  [A] INPUT SUBJECT ARTIFACT            |  [B] DISCOVERED REDDIT POST MATCH           |
+|  Image: lena.jpg                       |  Platform: REDDIT | Result: SOCIAL_MEDIA_POST|
+|  SHA-256: 7de7ed51...                  |  Title: lena.jpg now : r/programming         |
+|  Face: 512-D Normalized Vector         |  Similarity: 93.78% (Threshold: 65.0%)       |
+|  ===================================================================================  |
+|                                                                                       |
+|  BLOCKCHAIN STATE:                                                                    |
+|  Status: VERIFIED ON-CHAIN             |  Smart Contract: 0x5b1869...                 |
+|  Block: #1                             |  Tx Hash: 0x15105fcad...                     |
+|                                                                                       |
+|  EXPORT CENTER:   [ EXPORT PDF REPORT ]   [ EXPORT JSON ]   [ EXPORT CSV ]            |
++---------------------------------------------------------------------------------------+
+```
+
+### Key UI Features
+- **Live SSE Telemetry**: Streams real-time progress for all 7 stages without polling.
+- **Control Suite**:
+  - **`[ STOP EXECUTION ]`**: Immediately aborts processing at the current stage.
+  - **`[ RESTART TRACE ]`**: Creates a brand new, isolated `job_id` and re-executes all stages afresh.
+  - **`[ NEW IMAGE ]`**: Clears all states, inputs, and previews for a fresh investigation.
+- **Tamper Testing Sandbox**: Interactive live mutation simulator where users can modify any field (e.g. `social_platform`, `similarity_score`) to see the smart contract mathematically reject the altered record.
+- **Forensic Export Center**: One-click generation of court-ready PDF audit reports with cryptographic stamps, raw JSON evidence bundles, and spreadsheet CSVs.
 
 ---
 
-## 6. Project Structure
+## 5. Tamper Detection Sandbox & Mathematical Security
+
+```
+                               ┌────────────────────────────────┐
+                               │ Original Record:               │
+                               │ social_platform = "reddit"     │
+                               │ Hash: 51e9de61...              │
+                               └───────────────┬────────────────┘
+                                               │
+                                       (Altered to "x")
+                                               │
+                                               ▼
+                               ┌────────────────────────────────┐
+                               │ Tampered Record:               │
+                               │ social_platform = "x"          │
+                               │ Hash: 67823d59...              │
+                               └───────────────┬────────────────┘
+                                               │
+                                      (Smart Contract Lookup)
+                                               │
+                                               ▼
+                            ╔══════════════════════════════════════╗
+                            ║ [FAILED] HASH_MISMATCH               ║
+                            ║ SECURITY ALERT: DATA HAS BEEN TAMPERED║
+                            ╚══════════════════════════════════════╝
+```
+
+Any discrepancy between the local record and the on-chain fingerprint guarantees **100% mathematical detection of data corruption or tampering**.
+
+---
+
+## 6. Repository Structure
 
 ```
 FaceTraceLedger/
-│
-├── README.md
-├── requirements.txt
-├── .env.example
-├── .gitignore
-│
-├── src/
-│   ├── __init__.py
-│   ├── main.py                     # Main CLI Entrypoint (run, verify, demo-tamper)
-│   ├── config.py                   # Centralized typed configuration
-│   │
-│   ├── face/
-│   │   ├── __init__.py
-│   │   ├── detector.py             # InsightFace + OpenCV fallback detection
-│   │   ├── encoder.py              # 512-d normalized face embeddings
-│   │   └── matcher.py              # Cosine similarity and threshold evaluation
-│   │
-│   ├── search/
-│   │   ├── __init__.py
-│   │   ├── reverse_search.py       # Core reverse search coordinator & logging
-│   │   ├── result_parser.py        # URL validation, domain extraction, deduplication
-│   │   ├── candidate_downloader.py # Safe image downloader with MIME/size limits
-│   │   ├── candidate_verifier.py   # Candidate face recognition & ranking
-│   │   │
-│   │   └── providers/
-│   │       ├── __init__.py
-│   │       ├── base.py             # Abstract ReverseSearchProvider interface
-│   │       ├── serpapi_lens.py     # SerpApi Google Lens implementation
-│   │       ├── bing_visual.py      # Bing Visual Search implementation
-│   │       └── factory.py          # Dynamic provider registry & factory
-│   │
-│   ├── record/
-│   │   ├── __init__.py
-│   │   ├── metadata_builder.py     # Constructs privacy-preserving verification record
-│   │   └── canonicalizer.py        # Deterministic RFC-compliant JSON canonicalizer
-│   │
-│   ├── crypto/
-│   │   ├── __init__.py
-│   │   └── hashing.py              # SHA-256 hashing and bytes32 conversions
-│   │
-│   ├── blockchain/
-│   │   ├── __init__.py
-│   │   ├── client.py               # Web3 connection & stateful EVM tester fallback
-│   │   ├── uploader.py             # Smart contract registration
-│   │   └── verifier.py             # Smart contract provenance verification
-│   │
-│   └── utils/
-│       ├── __init__.py
-│       ├── logger.py               # UTF-8 formatted console logger
-│       └── helpers.py              # File I/O and timestamp utilities
-│
 ├── contracts/
-│   └── FaceTraceVerification.sol   # Solidity smart contract
-│
-├── scripts/
-│   ├── compile_contract.py         # Solc contract compilation script
-│   └── deploy_contract.py          # Contract deployment script
-│
-├── artifacts/
-│   └── FaceTraceVerification.json  # Compiled ABI and Bytecode
-│
+│   └── FaceTraceVerification.sol       # Solidity Smart Contract (^0.8.20)
 ├── data/
-│   ├── create_sample_images.py     # Sample image generator
-│   ├── input/                      # Input test portraits
-│   ├── candidates/                 # Temporary candidate image cache
-│   └── results/                    # Generated JSON verification artifacts
-│
-└── tests/
-    ├── test_face.py                # Face detection and math tests
-    ├── test_hashing.py             # SHA-256 and bytes32 tests
-    ├── test_record.py              # Canonicalization & schema tests
-    ├── test_search.py              # Provider, URL validation & parsing tests
-    ├── test_blockchain.py          # Smart contract on-chain tests
-    └── test_pipeline_e2e.py        # Full end-to-end integration tests
+│   ├── input/                          # Test portrait images (Lena, portraits)
+│   ├── candidates/                     # Candidate downloaded thumbnails
+│   └── results/                        # Generated JSON verification records
+├── frontend/
+│   ├── src/
+│   │   ├── components/                 # React UI components (Uploader, Comparison, Ledger)
+│   │   ├── hooks/                      # usePipeline state manager with SSE
+│   │   ├── services/                   # API client (Axios/Fetch, SSE, REST)
+│   │   ├── types/                      # TypeScript definitions (Pipeline, Blockchain, Social)
+│   │   └── utils/                      # PDF, JSON, CSV export formatters
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tailwind.config.js
+├── src/
+│   ├── api/
+│   │   └── server.py                   # FastAPI REST & SSE Backend Service
+│   ├── blockchain/
+│   │   ├── client.py                   # Web3 & Py-EVM local blockchain client
+│   │   ├── uploader.py                 # Smart contract transaction signer
+│   │   └── verifier.py                 # On-chain state verifier
+│   ├── crypto/
+│   │   └── hashing.py                  # SHA-256 & bytes32 conversions
+│   ├── face/
+│   │   ├── detector.py                 # InsightFace detection & bounding box
+│   │   ├── encoder.py                  # 512-D normalized embedding extractor
+│   │   └── matcher.py                  # Cosine similarity evaluator
+│   ├── record/
+│   │   ├── canonicalizer.py            # RFC-8785 JSON canonicalizer
+│   │   └── metadata_builder.py         # Structured verification record builder
+│   ├── search/
+│   │   ├── candidate_downloader.py     # Resilient image downloader
+│   │   ├── candidate_verifier.py       # Priority sorting & face verification
+│   │   ├── result_parser.py            # Social media classifier (9 platforms)
+│   │   ├── reverse_search.py           # Search coordinator
+│   │   └── providers/
+│   │       ├── base.py                 # Provider abstract interface
+│   │       ├── factory.py              # Provider registry
+│   │       └── serpapi_lens.py         # Google Lens provider with auto-compression
+│   ├── config.py                       # Centralized typed environment config
+│   └── main.py                         # Complete CLI pipeline entrypoint
+├── tests/
+│   ├── test_blockchain.py              # Smart contract tests
+│   ├── test_face.py                    # Face detection & cosine math tests
+│   ├── test_hashing.py                 # SHA-256 deterministic tests
+│   ├── test_pipeline_e2e.py            # Full end-to-end integration tests
+│   ├── test_record.py                  # Canonical JSON schema tests
+│   ├── test_search.py                  # Provider & URL parser tests
+│   ├── test_serpapi_robustness.py      # Masked keys & optimization tests
+│   └── test_social_media_classification.py # 20 Social media classification tests
+├── requirements.txt                    # Python dependencies
+├── pytest.ini                          # Pytest configuration
+├── .env.example                        # Environment template
+└── README.md                           # Master documentation
 ```
 
 ---
 
-## 7. Prerequisites & Installation
+## 7. Quickstart & Installation
 
 ### Prerequisites
-- Python 3.11 or higher
-- C++ Build Tools / OpenCV prerequisites (standard on Windows/Linux/macOS)
+- **Python**: `3.11+` / `3.12+` / `3.14+`
+- **Node.js**: `18.0+` & `npm`
+- **SerpApi API Key**: Get a free key at [serpapi.com](https://serpapi.com)
 
-### Step 1: Clone Repository & Create Virtual Environment
+### Step 1: Clone & Setup Backend Virtual Environment
 ```bash
 git clone https://github.com/your-username/FaceTraceLedger.git
 cd FaceTraceLedger
 
 python -m venv venv
-# Windows:
+# On Windows:
 venv\Scripts\activate
-# Linux/macOS:
+# On Linux/macOS:
 source venv/bin/activate
-```
 
-### Step 2: Install Dependencies
-```bash
 pip install -r requirements.txt
 ```
 
----
-
-## 8. Environment Configuration
-
+### Step 2: Configure Environment Variables
 Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
-
-Edit `.env`:
+Edit `.env` with your settings:
 ```env
 # Face Recognition Settings
 FACE_MATCH_THRESHOLD=0.65
@@ -217,212 +405,151 @@ FACE_MATCH_THRESHOLD=0.65
 REVERSE_SEARCH_PROVIDER=serpapi_lens
 SEARCH_API_KEY=your_serpapi_key_here
 
-# Blockchain Configuration
+# Blockchain Configuration (Built-in Py-EVM is used automatically if no external RPC is provided)
 BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
 BLOCKCHAIN_CHAIN_ID=1337
-BLOCKCHAIN_PRIVATE_KEY=0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d
 CONTRACT_ADDRESS=
 
-# Logging Level
+# Logging
 LOG_LEVEL=INFO
 ```
 
----
-
-## 9. Smart Contract Compilation & Deployment
-
-### Compile Solidity Contract
+### Step 3: Start the Backend Server
 ```bash
-python scripts/compile_contract.py
+python -m uvicorn src.api.server:app --port 8000 --host 127.0.0.1
 ```
-Output:
-```
-[CONTRACT] Compiling FaceTraceVerification.sol with solc 0.8.20...
-  [OK] Contract artifact generated successfully -> artifacts/FaceTraceVerification.json
-```
+*Backend runs on `http://127.0.0.1:8000`.*
 
-### Deploy Contract to Local Blockchain
+### Step 4: Start the Frontend UI
+In a separate terminal:
 ```bash
-python scripts/deploy_contract.py
+cd frontend
+npm install
+npm run dev
 ```
-*Note: If an external Ganache/Hardhat/Anvil node is not running on `http://127.0.0.1:8545`, the pipeline seamlessly utilizes its built-in stateful Py-EVM engine.*
+*Frontend runs on `http://127.0.0.1:5173`.*
 
 ---
 
-## 10. Running the Pipeline
+## 8. CLI & API Reference
 
-### Command 1: Full End-to-End Pipeline
+### CLI Commands
+
+#### 1. Full Pipeline Execution
 ```bash
-python -m src.main run --image data/input/sample_portrait.jpg
+python -m src.main run --image data/input/lena.jpg
 ```
+*Options:*
+- `--require-social-media`: Restricts match selection strictly to verified `SOCIAL_MEDIA_POST` results.
+- `--threshold 0.70`: Custom cosine similarity threshold.
 
-#### Example CLI Output:
-```
-============================================================
-                      FaceTrace Ledger                      
-       Face Search + Blockchain Verification Pipeline       
-============================================================
-
-[1/8] Loading input image
-  [OK] Image loaded: sample_portrait.jpg
-  SHA-256: 4b86c5657233ee63...
-
-[2/8] Detecting face
-  [OK] Face detected
-  Bounding Box: [48, 32, 272, 288]
-  Confidence: 0.98
-
-[3/8] Generating face encoding
-  [OK] Face embedding generated (Dimension: 512)
-
-[4/8] Performing genuine reverse image search
-  [SEARCH] Starting reverse image search
-  [SEARCH] Input image received: sample_portrait.jpg
-  [SEARCH] Image fingerprint: 4b86c5657233...
-  [SEARCH] Selected provider: serpapi_lens
-  [SEARCH] Sending image to search provider (serpapi_lens)
-  [SEARCH] Waiting for search results...
-  [SEARCH] Results received: 10
-  [OK] Search completed
-  Results Found: 10
-
-[5/8] Verifying candidate results
-  Valid URLs Parsed: 8
-
-  Candidate 1: Public Profile Directory
-  URL: https://directory.university.edu/faculty/researcher_photo.jpg
-  Similarity: 0.8950 (Threshold: 0.65)
-  [OK] PASSED THRESHOLD
-
-  BEST VERIFIED CANDIDATE
-  URL: https://directory.university.edu/faculty/researcher_photo.jpg
-  Similarity: 0.8950
-
-[6/8] Creating canonical verification record
-  [OK] Canonical record created and saved
-  Record Path: data/results/verification_record.json
-
-[7/8] Generating SHA-256 cryptographic fingerprint
-  [OK] Cryptographic fingerprint generated
-  Record Hash (SHA-256): ea73ae92bbac68d33add978f74d16ea4ae462b3ba8dd6b254e31c6c7b0d6d969
-
-[8/8] Uploading fingerprint to blockchain
-  [BLOCKCHAIN] Preparing transaction
-  [BLOCKCHAIN] Uploading record hash: ea73ae92bbac68d33add978f74d16ea4ae462b3ba8dd6b254e31c6c7b0d6d969
-  [BLOCKCHAIN] Submitter Address: 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf
-  [OK] Transaction confirmed on blockchain
-  Transaction Hash: 0x5a19803...
-  Block Number: 2
-
-============================================================
-                 BLOCKCHAIN RE-VERIFICATION                 
-============================================================
-
-  Local Computed Hash: ea73ae92bbac68d33add978f74d16ea4ae462b3ba8dd6b254e31c6c7b0d6d969
-  Blockchain Status: FOUND AND MATCHED
-  [OK] VERIFIED ON-CHAIN
-  Registration Timestamp: 1788325704
-  Submitter Address: 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf
-
-  RESULT: DATA MATCHES THE REGISTERED TAMPER-EVIDENT RECORD
-```
-
----
-
-### Command 2: Independent Blockchain Verification
-Verify an existing `verification_record.json` without re-running the search:
+#### 2. Independent Blockchain Verification
 ```bash
 python -m src.main verify --record data/results/verification_record.json
 ```
-Output:
-```
-============================================================
-                      FaceTrace Ledger                      
-               Blockchain Record Verification               
-============================================================
 
-  [1/2] Recomputing local cryptographic fingerprint...
-  Computed SHA-256: ea73ae92bbac68d33add978f74d16ea4ae462b3ba8dd6b254e31c6c7b0d6d969
-
-  [2/2] Querying smart contract on blockchain...
-  [OK] VERIFIED: Record matches on-chain state.
-  Block Timestamp: 1788325704
-  Submitter: 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf
-```
-
----
-
-### Command 3: Tampering Detection Demonstration
-Demonstrate mathematical tamper-evidence by altering a record field:
+#### 3. Tamper Detection Demonstration
 ```bash
 python -m src.main demo-tamper --record data/results/verification_record.json
 ```
-Output:
-```
-============================================================
-                      FaceTrace Ledger                      
-               Tamper Detection Demonstration               
-============================================================
-
---- STEP 1: VERIFYING ORIGINAL UNMODIFIED RECORD ---
-  Original Hash: ea73ae92bbac68d33add978f74d16ea4ae462b3ba8dd6b254e31c6c7b0d6d969
-  [OK] ORIGINAL RECORD VERIFIED ON-CHAIN
-
---- STEP 2: CREATING TAMPERED RECORD ---
-  Original Hash: ea73ae92bbac68d33add978f74d16ea4ae462b3ba8dd6b254e31c6c7b0d6d969
-  Tampered Hash: db47698cf2949283f625c0f1fa1546d59c88c753361053df2d59fceea4aad504
-
---- STEP 3: ATTEMPTING BLOCKCHAIN VERIFICATION OF TAMPERED RECORD ---
-  [FAILED] VERIFICATION FAILED (HASH_MISMATCH)
-
-  SECURITY ALERT: DATA HAS BEEN MODIFIED OR TAMPERED WITH!
-  The tampered hash (db47698cf2949283f625c0f1fa1546d59c88c753361053df2d59fceea4aad504) does not match any registered immutable blockchain state.
-```
 
 ---
 
-## 11. Testing
+### REST & SSE API Endpoints
 
-Run the automated test suite covering all modules:
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/pipeline/run` | Starts an isolated pipeline job. Supports multipart file upload or sample name. |
+| `GET` | `/api/pipeline/events/{job_id}` | Live Server-Sent Events (SSE) streaming progress across all 7 stages. |
+| `GET` | `/api/pipeline/result/{job_id}` | Retrieves completed job artifacts, metadata, and blockchain transactions. |
+| `POST` | `/api/pipeline/{job_id}/cancel` | Immediately requests graceful cancellation of a running job. |
+| `POST` | `/api/pipeline/{job_id}/restart` | Re-executes the pipeline with a brand new `job_id`. |
+| `POST` | `/api/verify` | Verifies any JSON verification record against on-chain smart contract state. |
+| `POST` | `/api/tamper-test` | Mutates a record field and evaluates on-chain hash mismatch. |
+| `GET` | `/api/diagnostics/search-provider` | Returns provider status, engine, and masked credentials. |
+| `GET` | `/api/health` | Comprehensive system health check for Face Engine, Search Provider, and Blockchain. |
+
+---
+
+## 9. Automated Test Suite
+
+FaceTrace Ledger features a **100% automated test suite with 47 tests** covering computer vision math, hashing determinism, search classification, smart contracts, and full pipeline integration.
+
 ```bash
 pytest -v
 ```
 
-Test coverage includes:
-- Face detection, bounding boxes, and multi-face prioritization
-- Normalized 512-d face embedding generation and cosine similarity math
-- Canonicalization determinism across reordered dictionary keys
-- SHA-256 cryptographic hashing and `bytes32` conversions
-- Pluggable search providers, URL deduplication, and candidate validation
-- Smart contract registration, duplicate prevention, and zero-hash rejection
-- Complete End-to-End pipeline integration test
+### Test Suite Execution Output
+```
+tests/test_blockchain.py::test_blockchain_register_and_verify PASSED          [  2%]
+tests/test_blockchain.py::test_blockchain_tamper_detection PASSED             [  4%]
+tests/test_blockchain.py::test_blockchain_duplicate_registration_rejection PASSED [  6%]
+tests/test_face.py::test_cosine_similarity_identical PASSED                   [  8%]
+tests/test_face.py::test_cosine_similarity_orthogonal PASSED                  [ 10%]
+tests/test_face.py::test_face_matcher_threshold PASSED                        [ 12%]
+tests/test_face.py::test_invalid_image_load PASSED                            [ 14%]
+tests/test_face.py::test_face_encoding_dimension PASSED                       [ 17%]
+tests/test_hashing.py::test_hash_string_deterministic PASSED                  [ 19%]
+tests/test_hashing.py::test_hash_string_collision_resistance PASSED           [ 21%]
+tests/test_hashing.py::test_hash_record_deterministic PASSED                  [ 23%]
+tests/test_hashing.py::test_hash_record_tamper_detection PASSED               [ 25%]
+tests/test_hashing.py::test_bytes32_conversion_roundtrip PASSED               [ 27%]
+tests/test_hashing.py::test_bytes32_conversion_with_0x_prefix PASSED          [ 29%]
+tests/test_hashing.py::test_bytes32_conversion_invalid_length PASSED          [ 31%]
+tests/test_pipeline_e2e.py::test_full_pipeline_end_to_end PASSED              [ 34%]
+tests/test_record.py::test_canonicalize_reordered_keys PASSED                 [ 36%]
+tests/test_record.py::test_build_verification_record_valid PASSED             [ 38%]
+tests/test_record.py::test_build_verification_record_invalid_sha256 PASSED   [ 40%]
+tests/test_search.py::test_url_validation PASSED                              [ 42%]
+tests/test_search.py::test_domain_extraction PASSED                           [ 44%]
+tests/test_search.py::test_parse_search_results_deduplication PASSED          [ 46%]
+tests/test_search.py::test_provider_factory_registration PASSED               [ 48%]
+tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_masked_key PASSED [ 51%]
+tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_missing_api_key_raises_auth_error PASSED [ 53%]
+tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_image_optimization_under_limit PASSED [ 55%]
+tests/test_serpapi_robustness.py::TestSerpApiRobustness::test_nonexistent_image_raises PASSED [ 57%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_instagram_post PASSED [ 59%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_instagram_reel PASSED [ 61%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_instagram_profile PASSED [ 63%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_x_twitter_post PASSED [ 65%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_x_twitter_profile PASSED [ 68%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_reddit_post PASSED [ 70%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_reddit_user PASSED [ 72%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_reddit_subreddit_page PASSED [ 74%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_tiktok_video PASSED [ 76%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_tiktok_profile PASSED [ 78%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_pinterest_pin PASSED [ 80%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_linkedin_post PASSED [ 82%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_linkedin_profile PASSED [ 85%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_facebook_post PASSED [ 87%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_threads_post PASSED [ 89%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_general_website PASSED [ 91%]
+tests/test_social_media_classification.py::TestSocialMediaClassification::test_malformed_urls_safe_fallback PASSED [ 93%]
+tests/test_social_media_classification.py::TestCandidatePrioritization::test_priority_order PASSED [ 95%]
+tests/test_social_media_classification.py::TestBlockchainRecordSocialProvenance::test_record_hash_includes_social_fields PASSED [ 97%]
+tests/test_social_media_classification.py::TestBlockchainRecordSocialProvenance::test_onchain_verification_with_social_metadata PASSED [100%]
+
+============================= 47 passed in 6.29s ==============================
+```
 
 ---
 
-## 12. Security & Privacy Architecture
+## 10. Privacy & Ethics Philosophy
 
-1. **Zero Biometric Data On-Chain**: Raw face embeddings, facial landmarks, and image files are **never** stored on the blockchain or in persistent databases.
-2. **Deterministic Canonicalization**: JSON records are serialized using sorted keys (`sort_keys=True`) and minimal separators (`separators=(',', ':')`) to guarantee exact cryptographic equivalence regardless of language runtime.
-3. **Smart Contract Security**:
-   - `require(recordHash != bytes32(0))` prevents registering empty fingerprints.
-   - `require(records[recordHash].timestamp == 0)` prevents hash overwrite attacks.
-   - Re-entrancy safe and gas-optimized `view` functions.
-4. **Safe Web Scraping**: MIME type verification (`image/jpeg`, `image/png`, `image/webp`), size limits (15 MB cap), and timeouts prevent SSRF and buffer exhaustion.
+1. **Zero Raw Biometric Storage**: Face coordinates and 512-D embeddings are strictly ephemeral in-memory variables.
+2. **Consent & Legitimate OSINT**: Engineered specifically for individuals, journalists, and security researchers verifying consent, copyright authenticity, and deepfake provenance.
+3. **Immutable Accountability**: Prevents retroactively altering forensic discovery records or falsely claiming image provenance.
+4. **Data Minimization**: Only the minimal necessary metadata (URL, domain, similarity score, cryptographic digests) is serialized into the canonical audit record.
 
 ---
 
-## 13. Known Limitations
+## 📄 License
 
-1. **Search Provider Coverage**: Reverse-image search accuracy depends on the indexing coverage and terms of the active search provider (SerpApi Google Lens, Bing Visual Search).
-2. **Probabilistic Face Similarity**: Cosine similarity scores between face embeddings are probabilistic metrics rather than definitive legal identifications.
-3. **Dynamic Web Lifespan**: Web pages and images discovered at the time of search may be deleted, updated, or protected by access control.
-4. **Integrity vs Truth**: The blockchain proves that a specific verification record existed in an exact state at a given timestamp; it does not independently verify external claims made on third-party websites.
-5. **Consent-Based Design**: This project is engineered exclusively for consenting auditability, research, and provenance validation, not for mass biometric tracking.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for full details.
 
 ---
 
-## 14. Troubleshooting
-
-- **`MISSING_API_KEY` Error**: Add `SEARCH_API_KEY=your_key` to `.env` or check provider choice.
-- **`NO_FACE_DETECTED` Error**: Ensure the input image has sufficient resolution (>112x112) and clear lighting.
-- **Blockchain Connection**: If no external RPC node is running on port 8545, the system automatically uses its local deterministic Py-EVM engine.
+<p align="center">
+  <strong>FaceTrace Ledger</strong> — <em>Crafted for Hacker House Goa 2026</em><br>
+  Designed for verifiable biometric truth, privacy preservation, and mathematical transparency.
+</p>
