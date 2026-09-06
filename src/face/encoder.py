@@ -51,14 +51,26 @@ class FaceEncoder:
         # Case 2: Compute embedding from cropped face region
         img = face_info.get("image")
         bbox = face_info.get("bbox")
+        raw_face = face_info.get("raw_face")
         if img is None or bbox is None:
             raise FaceEncodingError("ENCODING_FAILED: Missing image data or bbox in face_info")
 
-        x1, y1, x2, y2 = [max(0, int(c)) for c in bbox]
-        h, w = img.shape[:2]
-        x2, y2 = min(w, x2), min(h, y2)
+        # Explicit face alignment (crop-and-align to landmarks) if kps available
+        if raw_face is not None and hasattr(raw_face, 'kps') and raw_face.kps is not None:
+            try:
+                from insightface.utils import face_align
+                # norm_crop automatically applies similarity transform using the 5 landmarks
+                face_crop = face_align.norm_crop(img, kps=raw_face.kps, image_size=112)
+            except Exception as e:
+                logger.warning(f"Face alignment failed, falling back to basic crop: {e}")
+                x1, y1, x2, y2 = [max(0, int(c)) for c in bbox]
+                h, w = img.shape[:2]
+                face_crop = img[y1:min(h, y2), x1:min(w, x2)]
+        else:
+            x1, y1, x2, y2 = [max(0, int(c)) for c in bbox]
+            h, w = img.shape[:2]
+            face_crop = img[y1:min(h, y2), x1:min(w, x2)]
 
-        face_crop = img[y1:y2, x1:x2]
         if face_crop.size == 0:
             raise FaceEncodingError("ENCODING_FAILED: Cropped face area is empty")
 

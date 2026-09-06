@@ -2,6 +2,30 @@ import { PipelineResult, SystemStatus, VerificationRecord } from '../types/pipel
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+export async function checkPreflight(
+  file?: File,
+  sampleFilename?: string
+): Promise<{ status: string; message: string; faces: number; blur_score: number; face_area_pct: number }> {
+  const formData = new FormData();
+  if (file) {
+    formData.append('image', file);
+  } else if (sampleFilename) {
+    formData.append('sample_filename', sampleFilename);
+  }
+
+  const res = await fetch(`${API_BASE}/api/preflight`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Failed to run preflight checks');
+  }
+
+  return res.json();
+}
+
 export async function uploadAndRunPipeline(
   file?: File,
   sampleFilename?: string,

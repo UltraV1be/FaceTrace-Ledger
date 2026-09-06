@@ -376,6 +376,63 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
         loop.close()
 
 
+import cv2
+import numpy as np
+
+@app.post("/api/preflight")
+async def preflight_check(
+    image: Optional[UploadFile] = File(None),
+    sample_filename: Optional[str] = Form(None)
+):
+    """Pre-flight check for face detection and image quality."""
+    target_path = None
+    if image and image.filename:
+        target_path = config.input_dir / f"temp_preflight_{image.filename}"
+        content = await image.read()
+        with open(target_path, "wb") as f:
+            f.write(content)
+    elif sample_filename:
+        target_path = config.input_dir / sample_filename
+    
+    if not target_path or not target_path.exists():
+        raise HTTPException(status_code=400, detail="Image not provided or found.")
+
+    detector = FaceDetector()
+    try:
+        img_bgr = detector.load_image(target_path)
+        faces = detector.detect_faces(img_bgr)
+    except FaceDetectionError as e:
+        return {"status": "error", "message": str(e), "faces": 0, "blur_score": 0, "face_area_pct": 0}
+
+    # Blur check
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
+
+    if not faces:
+        return {"status": "error", "message": "ZERO_FACES: No faces detected in the image.", "faces": 0, "blur_score": blur_score, "face_area_pct": 0}
+
+    if len(faces) > 1:
+        return {"status": "error", "message": f"MULTIPLE_FACES: Detected {len(faces)} faces. Please crop the image so only the target face remains.", "faces": len(faces), "blur_score": blur_score, "face_area_pct": 0}
+
+    # Area check
+    face = faces[0]
+    face_area = face["area"]
+    img_area = img_bgr.shape[0] * img_bgr.shape[1]
+    area_pct = (face_area / img_area) * 100
+
+    warnings = []
+    if blur_score < 100:
+        warnings.append("BLURRY: Image is extremely blurry. Detection may be unreliable.")
+    if area_pct < 2.0:
+        return {"status": "error", "message": "FACE_TOO_SMALL: The face occupies less than 2% of the image area. Please crop or use a higher resolution image.", "faces": 1, "blur_score": blur_score, "face_area_pct": area_pct}
+    if area_pct < 5.0:
+        warnings.append("BACKGROUND_DOMINATES: The face is very small relative to the frame. Consider cropping.")
+
+    if warnings:
+        return {"status": "warning", "message": " ".join(warnings), "faces": 1, "blur_score": blur_score, "face_area_pct": area_pct}
+
+    return {"status": "success", "message": "Ready", "faces": 1, "blur_score": blur_score, "face_area_pct": area_pct}
+
 @app.post("/api/pipeline/run")
 async def run_pipeline_endpoint(
     background_tasks: BackgroundTasks,

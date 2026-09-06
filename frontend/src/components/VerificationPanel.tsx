@@ -40,15 +40,15 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
   };
 
   return (
-    <div className="bg-[#F5F0E3] text-[#141414] border-2 border-[#141414] shadow-brutal p-6 lg:p-8">
+    <div className="bg-goa-cream text-goa-dark border-2 border-goa-dark shadow-brutal p-6 lg:p-8">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-[#141414] pb-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-goa-dark pb-4 mb-6">
         <div>
-          <span className="text-xs font-mono font-bold text-[#F50064] uppercase tracking-widest block">
+          <span className="text-xs font-mono font-bold text-goa-pink uppercase tracking-widest block">
             STAGE 07 // INTEGRITY AUDIT
           </span>
-          <h3 className="font-display font-black text-2xl uppercase tracking-tight text-[#141414]">
+          <h3 className="font-display font-black text-2xl uppercase tracking-tight text-goa-dark">
             BLOCKCHAIN RE-VERIFICATION
           </h3>
         </div>
@@ -56,16 +56,16 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
         <button
           onClick={handleVerify}
           disabled={isVerifying}
-          className="mt-3 sm:mt-0 px-5 py-2.5 bg-[#0A2E23] text-[#FAF7F0] hover:bg-[#144F3F] font-mono text-xs font-bold uppercase transition flex items-center space-x-2 border-2 border-[#141414] shadow-brutal-sm"
+          className="mt-3 sm:mt-0 px-5 py-2.5 bg-goa-green text-goa-cream hover:bg-[#144F3F] font-mono text-xs font-bold uppercase transition flex items-center space-x-2 border-2 border-goa-dark shadow-brutal"
         >
           {isVerifying ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#F50064]" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-goa-pink" />
               <span>QUERYING BLOCKCHAIN...</span>
             </>
           ) : (
             <>
-              <ShieldCheck className="w-3.5 h-3.5 text-[#00E599]" />
+              <ShieldCheck className="w-3.5 h-3.5 text-goa-yellow" />
               <span>[ RUN RE-VERIFICATION ]</span>
             </>
           )}
@@ -73,24 +73,24 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
       </div>
 
       {/* Comparison Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs mb-6 text-[#141414]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs mb-6 text-goa-dark">
         
         {/* Local Recomputed Hash */}
-        <div className="bg-white border-2 border-[#141414] p-4 space-y-2 shadow-brutal-sm">
+        <div className="bg-white border-2 border-goa-dark p-4 space-y-2 shadow-brutal">
           <span className="text-[#666666] uppercase block text-[10px] font-bold">
             [1] LOCAL RECOMPUTED SHA-256:
           </span>
-          <div className="font-bold text-[#141414] break-all bg-[#FAF7F0] p-2.5 border border-[#141414]/20 select-all">
+          <div className="font-bold text-goa-dark break-all bg-goa-cream p-2.5 border border-goa-dark/20 select-all">
             {currentRecordHash}
           </div>
         </div>
 
         {/* Blockchain On-Chain Hash */}
-        <div className="bg-white border-2 border-[#141414] p-4 space-y-2 shadow-brutal-sm">
+        <div className="bg-white border-2 border-goa-dark p-4 space-y-2 shadow-brutal">
           <span className="text-[#666666] uppercase block text-[10px] font-bold">
             [2] SMART CONTRACT ON-CHAIN RECORD:
           </span>
-          <div className="font-bold text-[#0A2E23] break-all bg-[#FAF7F0] p-2.5 border border-[#141414]/20 select-all">
+          <div className="font-bold text-goa-green break-all bg-goa-cream p-2.5 border border-goa-dark/20 select-all">
             {verificationResult ? (
               verificationResult.verified ? currentRecordHash : 'NOT FOUND / MISMATCH'
             ) : (
@@ -106,20 +106,20 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
         <div
           className={`p-5 border-2 text-center transition ${
             verificationResult.verified
-              ? 'bg-[#0A2E23] text-[#FAF7F0] border-[#141414] shadow-brutal'
+              ? 'bg-goa-green text-goa-cream border-goa-dark shadow-brutal'
               : 'bg-red-50 text-red-700 border-red-500 shadow-brutal'
           }`}
         >
           {verificationResult.verified ? (
             <div className="space-y-2">
-              <div className="inline-flex items-center space-x-2 px-3 py-1 bg-[#00E599]/20 text-[#00E599] border border-[#00E599] font-mono text-xs font-bold uppercase">
-                <CheckCircle2 className="w-4 h-4 text-[#00E599]" />
+              <div className="inline-flex items-center space-x-2 px-3 py-1 bg-goa-yellow/20 text-goa-yellow border border-goa-yellow font-mono text-xs font-bold uppercase">
+                <CheckCircle2 className="w-4 h-4 text-goa-yellow" />
                 <span>INTEGRITY VERIFIED ON-CHAIN</span>
               </div>
-              <h4 className="font-display font-black text-xl uppercase tracking-wider text-[#FAF7F0]">
+              <h4 className="font-display font-black text-xl uppercase tracking-wider text-goa-cream">
                 DATA MATCHES REGISTERED IMMUTABLE RECORD
               </h4>
-              <p className="font-mono text-xs text-[#EBE3D0] max-w-xl mx-auto leading-relaxed">
+              <p className="font-mono text-xs text-goa-cream max-w-xl mx-auto leading-relaxed">
                 The current verification record, similarity score, and discovered URLs are cryptographically identical to the on-chain snapshot registered at Block #{verificationResult.timestamp ? 'Confirmed' : '1'}.
               </p>
             </div>

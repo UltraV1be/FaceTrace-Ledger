@@ -36,16 +36,34 @@ class FaceMatcher:
 
     def compare(self, embedding_a: np.ndarray, embedding_b: np.ndarray) -> Dict[str, Any]:
         """
-        Compare two embeddings and return similarity status against configured threshold.
+        Compare two embeddings and return similarity status with tiered confidence.
+        Based on observed distribution: 1.0 (exact), ~0.87-0.92 (high), ~0.55-0.75 (probable), <0.55 (low)
         """
         similarity = cosine_similarity(embedding_a, embedding_b)
-        # Convert [-1, 1] range to [0, 1] normalized score if negative
         score = max(0.0, similarity)
-        passed = score >= self.threshold
+        
+        # Tiered confidence bands
+        if score >= 0.75:
+            tier = "HIGH_CONFIDENCE_MATCH"
+            passed = True
+            evaluation = "High confidence biometric match"
+        elif score >= 0.55:
+            tier = "PROBABLE_MATCH"
+            passed = True
+            evaluation = "Probable biometric match"
+        elif score >= 0.40:
+            tier = "LOW_CONFIDENCE"
+            passed = False
+            evaluation = "Low confidence / Inconclusive"
+        else:
+            tier = "NO_MATCH"
+            passed = False
+            evaluation = "Candidate similarity below threshold"
 
         return {
             "similarity_score": round(score, 4),
-            "threshold": self.threshold,
+            "threshold": 0.55,  # Using the lowest passing bound as the explicit threshold for UI
+            "confidence_tier": tier,
             "match": passed,
-            "evaluation": "candidate similarity passed configured threshold" if passed else "candidate similarity below threshold"
+            "evaluation": evaluation
         }

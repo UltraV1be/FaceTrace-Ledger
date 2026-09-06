@@ -1,45 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Imbue:opsz,wght@10..100,100..900&family=Victor+Mono:ital,wght@0,100..700;1,100..700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-forest-950: #071F17;
-  --color-forest-900: #0A2E23;
-  --color-forest-800: #0D3B2E;
-  --color-forest-700: #144F3F;
-  --color-forest-600: #1D6B56;
+  --color-goa-cream: #fffbe8;
+  --color-goa-dark: #14130f;
+  --color-goa-yellow: #fee101;
+  --color-goa-red: #fb2c36;
+  --color-goa-pink: #ff0080;
+  --color-goa-green: #0b6839;
   
-  --color-cream-50: #FAF7F0;
-  --color-cream-100: #F5F0E3;
-  --color-cream-200: #EBE3D0;
-  --color-cream-300: #DED3BA;
+  --font-display: 'Imbue', serif;
+  --font-sans: 'Victor Mono', monospace;
+  --font-mono: 'Victor Mono', monospace;
 
-  --color-pink: #F50064;
-  --color-pink-hot: #FF006E;
-  --color-pink-light: #FF3388;
-  --color-pink-glow: rgba(245, 0, 100, 0.15);
-
-  --color-charcoal: #141414;
-  --color-charcoal-light: #242424;
-  --color-charcoal-muted: #525252;
-
-  --color-emerald: #00E599;
-  --color-emerald-glow: rgba(0, 229, 153, 0.15);
-
-  --font-display: 'Syne', sans-serif;
-  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  --shadow-brutal: 4px 4px 0px 0px #141414;
-  --shadow-brutal-pink: 4px 4px 0px 0px #F50064;
-  --shadow-brutal-green: 4px 4px 0px 0px #0A2E23;
-  --shadow-brutal-sm: 2px 2px 0px 0px #141414;
-  --shadow-brutal-lg: 8px 8px 0px 0px #141414;
+  --shadow-brutal: 4px 4px 0px 0px #14130f;
+  --shadow-brutal-pink: 4px 4px 0px 0px #ff0080;
+  --shadow-brutal-green: 4px 4px 0px 0px #0b6839;
+  --shadow-brutal-sm: 2px 2px 0px 0px #14130f;
+  --shadow-brutal-lg: 8px 8px 0px 0px #14130f;
 }
 
 @layer base {
   body {
-    background-color: #071F17;
-    color: #F5F0E3;
-    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--color-goa-green);
+    background-image: url('/bg-goa.jpg');
+    background-size: cover;
+    background-position: bottom center;
+    background-attachment: fixed;
+    color: var(--color-goa-cream);
+    font-family: 'Victor Mono', monospace;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Imbue', serif;
+    font-weight: 800;
   }
 }
 
