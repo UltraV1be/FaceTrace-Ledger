@@ -416,6 +416,10 @@ LOG_LEVEL=INFO
 
 ### Step 3: Start the Backend Server
 ```bash
+# Windows (using Python launcher):
+py -m uvicorn src.api.server:app --port 8000 --host 127.0.0.1
+
+# Linux / macOS / Virtual Environment:
 python -m uvicorn src.api.server:app --port 8000 --host 127.0.0.1
 ```
 *Backend runs on `http://127.0.0.1:8000`.*
