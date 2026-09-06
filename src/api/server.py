@@ -137,37 +137,21 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
         detector = FaceDetector()
         try:
             face_info = detector.detect_primary_face(image_path)
-            if not face_info or not face_info.get("detected", False):
-                err_payload = {
-                    "error_code": "NO_FACE_DETECTED",
-                    "stage": "face_detection",
-                    "stage_name": "02 — DETECT",
-                    "stage_number": 2,
-                    "valid_reason": "No human face could be detected in the provided image.",
-                    "details": "InsightFace deep neural detector found 0 recognizable facial landmarks in the input image.",
-                    "blocked_stages": ["03 — ENCODE: BLOCKED", "04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
-                }
-                jobs[job_id]["status"] = "failed"
-                jobs[job_id]["error"] = err_payload["valid_reason"]
-                jobs[job_id]["error_details"] = err_payload
-                loop.run_until_complete(push_event(job_id, "face_detection", "failed", err_payload["valid_reason"], err_payload))
-                loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
-                return
         except FaceDetectionError as e:
             err_payload = {
                 "error_code": "NO_FACE_DETECTED",
                 "stage": "face_detection",
                 "stage_name": "02 — DETECT",
                 "stage_number": 2,
-                "valid_reason": f"Face detection failed: {e}",
+                "valid_reason": str(e),
                 "details": str(e),
                 "blocked_stages": ["03 — ENCODE: BLOCKED", "04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
             }
             jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error"] = str(e)
             jobs[job_id]["error_details"] = err_payload
-            loop.run_until_complete(push_event(job_id, "face_detection", "failed", err_payload["valid_reason"], err_payload))
-            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "face_detection", "failed", str(e), err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", str(e), err_payload))
             return
         except Exception as e:
             err_payload = {
@@ -175,15 +159,15 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
                 "stage": "face_detection",
                 "stage_name": "02 — DETECT",
                 "stage_number": 2,
-                "valid_reason": f"Face detection engine encountered an error: {e}",
+                "valid_reason": f"Face detection error: {e}",
                 "details": str(e),
                 "blocked_stages": ["03 — ENCODE: BLOCKED", "04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
             }
             jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error"] = str(e)
             jobs[job_id]["error_details"] = err_payload
-            loop.run_until_complete(push_event(job_id, "face_detection", "failed", err_payload["valid_reason"], err_payload))
-            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "face_detection", "failed", str(e), err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", str(e), err_payload))
             return
 
         bbox = face_info["bbox"]

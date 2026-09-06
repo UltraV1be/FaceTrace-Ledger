@@ -54,16 +54,21 @@ class LocalFileDownloader(CandidateDownloader):
 
 def test_full_pipeline_end_to_end(tmp_path):
     # 1. Create test face image
+    sample_file = Path("data/input/lena.jpg")
     img_path = tmp_path / "e2e_face.jpg"
-    img = np.full((300, 300, 3), 220, dtype=np.uint8)
-    cv2.ellipse(img, (150, 150), (80, 100), 0, 0, 360, (200, 170, 130), -1)
-    cv2.circle(img, (120, 130), 10, (255, 255, 255), -1)
-    cv2.circle(img, (180, 130), 10, (255, 255, 255), -1)
-    cv2.circle(img, (120, 130), 5, (50, 30, 10), -1)
-    cv2.circle(img, (180, 130), 5, (50, 30, 10), -1)
-    cv2.line(img, (150, 135), (150, 170), (160, 130, 100), 2)
-    cv2.ellipse(img, (150, 195), (30, 15), 0, 0, 180, (60, 60, 160), -1)
-    cv2.imwrite(str(img_path), img)
+    if sample_file.exists():
+        img = cv2.imread(str(sample_file))
+        cv2.imwrite(str(img_path), img)
+    else:
+        img = np.full((300, 300, 3), 220, dtype=np.uint8)
+        cv2.ellipse(img, (150, 150), (80, 100), 0, 0, 360, (200, 170, 130), -1)
+        cv2.circle(img, (120, 130), 10, (255, 255, 255), -1)
+        cv2.circle(img, (180, 130), 10, (255, 255, 255), -1)
+        cv2.circle(img, (120, 130), 5, (50, 30, 10), -1)
+        cv2.circle(img, (180, 130), 5, (50, 30, 10), -1)
+        cv2.line(img, (150, 135), (150, 170), (160, 130, 100), 2)
+        cv2.ellipse(img, (150, 195), (30, 15), 0, 0, 180, (60, 60, 160), -1)
+        cv2.imwrite(str(img_path), img)
 
     image_sha256 = hash_file(img_path)
     assert len(image_sha256) == 64

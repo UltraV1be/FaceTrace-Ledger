@@ -114,11 +114,18 @@ export function usePipeline() {
         console.warn('Termination cancel warning:', err);
       }
     }
+    setSelectedFile(null);
+    setSampleFilename(undefined);
+    setPipelineResult(null);
+    setErrorMessage(null);
+    setErrorDetails(null);
     setIsProcessing(false);
     setIsCancelling(false);
-    setIsCancelled(true);
-    setExecutionState('TERMINATED');
+    setIsCancelled(false);
+    setCurrentJobId(null);
+    setExecutionState('IDLE');
     setIsFailureModalOpen(false);
+    setStages(INITIAL_STAGES.map((s) => ({ ...s, status: 'idle', message: undefined })));
   }, [currentJobId, isProcessing]);
 
   const startNewProcess = useCallback(() => {
