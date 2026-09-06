@@ -89,19 +89,6 @@ class FaceDetector:
             except Exception as e:
                 logger.debug(f"CascadeClassifier fallback: {e}")
 
-        # Strategy 3: Heuristic center bounding box if image is a portrait photograph
-        h, w = img_bgr.shape[:2]
-        if min(h, w) >= 50:
-            pad_w = int(w * 0.15)
-            pad_h = int(h * 0.10)
-            bbox = [pad_w, pad_h, w - pad_w, h - pad_h]
-            faces.append({
-                "bbox": bbox,
-                "confidence": 0.75,
-                "raw_face": None,
-                "area": (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-            })
-
         return faces
 
     def detect_primary_face(self, image_input: Path | str | np.ndarray) -> Dict[str, Any]:

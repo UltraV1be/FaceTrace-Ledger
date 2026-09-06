@@ -21,33 +21,33 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     : candidates;
 
   return (
-    <div className="bg-[#F5F0E3] text-[#141414] border-2 border-[#141414] shadow-brutal p-6">
+    <div className="bg-goa-cream text-goa-dark border-2 border-goa-dark shadow-brutal p-6">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-[#141414] pb-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-goa-dark pb-4 mb-6">
         <div>
-          <span className="text-xs font-mono font-bold text-[#F50064] uppercase tracking-widest block">
+          <span className="text-xs font-mono font-bold text-goa-pink uppercase tracking-widest block">
             STAGE 03-04 // OPEN WEB RECONNAISSANCE
           </span>
-          <h3 className="font-display font-black text-2xl uppercase tracking-tight text-[#141414] flex items-center gap-2">
+          <h3 className="font-display font-black text-2xl uppercase tracking-tight text-goa-dark flex items-center gap-2">
             <span>DISCOVERED CANDIDATES</span>
-            <span className="text-xs font-mono bg-[#F50064] text-white px-2.5 py-0.5 font-bold">
+            <span className="text-xs font-mono bg-goa-pink text-goa-cream px-2.5 py-0.5 font-bold">
               {candidates.length} OF {totalFound} EVALUATED
             </span>
           </h3>
         </div>
 
         <div className="mt-3 sm:mt-0 flex items-center space-x-3 text-xs font-mono">
-          <div className="bg-white border-2 border-[#141414] px-3 py-1 text-[#141414] font-bold shadow-brutal-sm">
-            PROVIDER: <span className="font-bold text-[#0A2E23]">{provider.toUpperCase()}</span>
+          <div className="bg-white border-2 border-goa-dark px-3 py-1 text-goa-dark font-bold shadow-brutal">
+            PROVIDER: <span className="font-bold text-goa-green">{provider.toUpperCase()}</span>
           </div>
 
           <button
             onClick={() => setShowOnlyMatches(!showOnlyMatches)}
-            className={`px-3 py-1.5 border-2 transition font-bold flex items-center space-x-1.5 shadow-brutal-sm ${
+            className={`px-3 py-1.5 border-2 transition font-bold flex items-center space-x-1.5 shadow-brutal ${
               showOnlyMatches
-                ? 'bg-[#F50064] text-white border-[#141414]'
-                : 'bg-white text-[#141414] border-[#141414] hover:bg-[#FAF7F0]'
+                ? 'bg-goa-pink text-goa-cream border-goa-dark'
+                : 'bg-white text-goa-dark border-goa-dark hover:bg-goa-cream'
             }`}
           >
             <Filter className="w-3.5 h-3.5" />
@@ -69,9 +69,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
           ))}
         </div>
       ) : (
-        <div className="bg-white border-2 border-dashed border-[#141414]/40 p-8 text-center">
+        <div className="bg-white border-2 border-dashed border-goa-dark/40 p-8 text-center">
           <Search className="w-8 h-8 mx-auto text-[#888888] mb-2" />
-          <p className="font-display font-bold text-sm uppercase text-[#141414]">
+          <p className="font-display font-bold text-sm uppercase text-goa-dark">
             NO CANDIDATES MATCHING FILTER
           </p>
           <p className="text-xs font-mono text-[#555555] mt-1">

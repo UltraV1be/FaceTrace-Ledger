@@ -1,8 +1,24 @@
 import jsPDF from 'jspdf';
 import { PipelineResult } from '../types/pipeline';
 import { formatTimestamp } from './formatters';
+import { getFullMediaUrl } from '../services/api';
 
-export function generatePdfReport(result: PipelineResult): void {
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.error("Failed to load image for PDF", e);
+    return null;
+  }
+}
+
+export async function generatePdfReport(result: PipelineResult): Promise<void> {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -112,7 +128,50 @@ export function generatePdfReport(result: PipelineResult): void {
   drawField('Block Number', `Block #${result.blockchain.block_number}`);
   drawField('Submitter', result.blockchain.submitter, true);
 
-  // Verification Seal
+  // Verification Seal & Side-by-Side Images
+  y += 6;
+  
+  // Attempt to load and render Side-by-Side Images
+  try {
+    const inputUrl = getFullMediaUrl(result.image_url);
+    const candidateThumbPath = result.best_match?.display_image_url || result.best_match?.thumbnail_url || '';
+    const candidateUrl = getFullMediaUrl(candidateThumbPath);
+
+    const [inputBase64, candidateBase64] = await Promise.all([
+      fetchImageAsBase64(inputUrl),
+      candidateThumbPath ? fetchImageAsBase64(candidateUrl) : Promise.resolve(null)
+    ]);
+
+    if (inputBase64 || candidateBase64) {
+      doc.setFillColor(13, 59, 46);
+      doc.rect(14, y, pageWidth - 28, 45, 'F');
+
+      doc.setTextColor(245, 240, 227);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      
+      const imgWidth = 35;
+      const imgHeight = 35;
+      const boxMidY = y + 5;
+
+      // Left Image (Input)
+      doc.text('INPUT ARTIFACT', 18, boxMidY + 3);
+      if (inputBase64) {
+        doc.addImage(inputBase64, 'JPEG', 18, boxMidY + 5, imgWidth, imgHeight);
+      }
+      
+      // Right Image (Candidate)
+      doc.text('MATCHED CANDIDATE', 18 + imgWidth + 10, boxMidY + 3);
+      if (candidateBase64) {
+        doc.addImage(candidateBase64, 'JPEG', 18 + imgWidth + 10, boxMidY + 5, imgWidth, imgHeight);
+      }
+
+      y += 50;
+    }
+  } catch (err) {
+    console.error("Failed to render side-by-side images", err);
+  }
+
   y += 4;
   doc.setFillColor(10, 46, 35);
   doc.rect(14, y, pageWidth - 28, 16, 'F');

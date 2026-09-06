@@ -21,3 +21,12 @@ pydantic>=2.5.0
 
 # Testing & CLI
 pytest>=7.4.0
+
+# API Framework
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+
+# Additional dependencies identified by code scan
+eth-account>=0.14.0
+sse-starlette>=3.4.10

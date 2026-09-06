@@ -27,9 +27,14 @@ export const ExportCenter: React.FC<ExportCenterProps> = ({ result }) => {
     showSuccess('✓ CSV AUDIT SUMMARY EXPORTED');
   };
 
-  const handleExportPdf = () => {
-    generatePdfReport(result);
-    showSuccess('✓ FORENSIC PDF REPORT GENERATED');
+  const handleExportPdf = async () => {
+    try {
+      await generatePdfReport(result);
+      showSuccess('✓ FORENSIC PDF REPORT GENERATED');
+    } catch (e) {
+      console.error(e);
+      showSuccess('❌ PDF GENERATION FAILED');
+    }
   };
 
   const handleCopySummary = () => {
@@ -52,22 +57,22 @@ Status: VERIFIED ON-CHAIN`;
   };
 
   return (
-    <div className="bg-[#F5F0E3] text-[#141414] border-2 border-[#141414] shadow-brutal p-6 lg:p-8">
+    <div className="bg-goa-cream text-goa-dark border-2 border-goa-dark shadow-brutal p-6 lg:p-8">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-[#141414] pb-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-goa-dark pb-4 mb-6">
         <div>
-          <span className="text-xs font-mono font-bold text-[#F50064] uppercase tracking-widest block">
+          <span className="text-xs font-mono font-bold text-goa-pink uppercase tracking-widest block">
             STAGE 08 // AUDIT ARTIFACTS
           </span>
-          <h3 className="font-display font-black text-2xl uppercase tracking-tight text-[#141414] flex items-center gap-2">
+          <h3 className="font-display font-black text-2xl uppercase tracking-tight text-goa-dark flex items-center gap-2">
             <span>EXPORT EVIDENCE CENTER</span>
           </h3>
         </div>
 
         {feedback && (
-          <div className="mt-2 sm:mt-0 px-3 py-1 bg-[#0A2E23] text-[#00E599] font-mono text-xs font-bold border border-[#141414] shadow-brutal-sm flex items-center space-x-1.5 animate-bounce">
-            <Check className="w-3.5 h-3.5 text-[#00E599]" />
+          <div className="mt-2 sm:mt-0 px-3 py-1 bg-goa-green text-goa-yellow font-mono text-xs font-bold border border-goa-dark shadow-brutal flex items-center space-x-1.5 animate-bounce">
+            <Check className="w-3.5 h-3.5 text-goa-yellow" />
             <span>{feedback}</span>
           </div>
         )}
@@ -83,13 +88,13 @@ Status: VERIFIED ON-CHAIN`;
         {/* PDF Export */}
         <button
           onClick={handleExportPdf}
-          className="p-4 bg-[#0A2E23] text-[#FAF7F0] hover:bg-[#144F3F] border-2 border-[#141414] shadow-brutal text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
+          className="p-4 bg-goa-green text-goa-cream hover:bg-[#144F3F] border-2 border-goa-dark shadow-brutal text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
         >
           <div className="flex items-center justify-between mb-3">
-            <FileText className="w-6 h-6 text-[#F50064] group-hover:scale-110 transition-transform" />
-            <Download className="w-4 h-4 text-[#EBE3D0]" />
+            <FileText className="w-6 h-6 text-goa-pink group-hover:scale-110 transition-transform" />
+            <Download className="w-4 h-4 text-goa-cream" />
           </div>
-          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-[#FAF7F0]">
+          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-goa-cream">
             PDF REPORT
           </h4>
           <span className="text-[10px] font-mono text-[#DED3BA] block mt-1">
@@ -100,13 +105,13 @@ Status: VERIFIED ON-CHAIN`;
         {/* JSON Export */}
         <button
           onClick={handleExportJson}
-          className="p-4 bg-white text-[#141414] hover:bg-[#FAF7F0] border-2 border-[#141414] shadow-brutal text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
+          className="p-4 bg-white text-goa-dark hover:bg-goa-cream border-2 border-goa-dark shadow-brutal text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
         >
           <div className="flex items-center justify-between mb-3">
-            <FileJson className="w-6 h-6 text-[#0A2E23] group-hover:scale-110 transition-transform" />
+            <FileJson className="w-6 h-6 text-goa-green group-hover:scale-110 transition-transform" />
             <Download className="w-4 h-4 text-[#666666]" />
           </div>
-          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-[#141414]">
+          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-goa-dark">
             JSON EVIDENCE
           </h4>
           <span className="text-[10px] font-mono text-[#555555] block mt-1">
@@ -117,13 +122,13 @@ Status: VERIFIED ON-CHAIN`;
         {/* CSV Export */}
         <button
           onClick={handleExportCsv}
-          className="p-4 bg-white text-[#141414] hover:bg-[#FAF7F0] border-2 border-[#141414] shadow-brutal text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
+          className="p-4 bg-white text-goa-dark hover:bg-goa-cream border-2 border-goa-dark shadow-brutal text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
         >
           <div className="flex items-center justify-between mb-3">
-            <FileSpreadsheet className="w-6 h-6 text-[#0A2E23] group-hover:scale-110 transition-transform" />
+            <FileSpreadsheet className="w-6 h-6 text-goa-green group-hover:scale-110 transition-transform" />
             <Download className="w-4 h-4 text-[#666666]" />
           </div>
-          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-[#141414]">
+          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-goa-dark">
             CSV SUMMARY
           </h4>
           <span className="text-[10px] font-mono text-[#555555] block mt-1">
@@ -134,16 +139,16 @@ Status: VERIFIED ON-CHAIN`;
         {/* Copy Summary */}
         <button
           onClick={handleCopySummary}
-          className="p-4 bg-[#F50064] text-white hover:bg-[#FF006E] border-2 border-[#141414] shadow-brutal-pink text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
+          className="p-4 bg-goa-pink text-goa-cream hover:bg-[#FF006E] border-2 border-goa-dark shadow-brutal text-left transition active:translate-x-0.5 active:translate-y-0.5 group cursor-pointer"
         >
           <div className="flex items-center justify-between mb-3">
-            <Copy className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
-            <Check className="w-4 h-4 text-white" />
+            <Copy className="w-6 h-6 text-goa-cream group-hover:scale-110 transition-transform" />
+            <Check className="w-4 h-4 text-goa-cream" />
           </div>
-          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-white">
+          <h4 className="font-display font-bold text-sm uppercase tracking-wider text-goa-cream">
             COPY SUMMARY
           </h4>
-          <span className="text-[10px] font-mono text-white/90 block mt-1">
+          <span className="text-[10px] font-mono text-goa-cream/90 block mt-1">
             Format for terminal & incident logs
           </span>
         </button>

@@ -56,24 +56,24 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-2xl bg-[#F5F0E3] text-[#141414] border-2 border-[#141414] shadow-brutal p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-2xl bg-goa-cream text-goa-dark border-2 border-goa-dark shadow-brutal p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-[#141414] pb-4 mb-6">
+        <div className="flex items-center justify-between border-b-2 border-goa-dark pb-4 mb-6">
           <div>
-            <span className="text-xs font-mono font-bold text-[#F50064] uppercase tracking-widest block">
+            <span className="text-xs font-mono font-bold text-goa-pink uppercase tracking-widest block">
               SYSTEM PROTOCOL
             </span>
-            <h3 className="font-display font-black text-2xl uppercase tracking-tight text-[#141414]">
+            <h3 className="font-display font-black text-2xl uppercase tracking-tight text-goa-dark">
               HOW FACETRACE LEDGER WORKS
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-[#EBE3D0] border border-[#141414] transition text-[#141414]"
+            className="p-1.5 hover:bg-[#EBE3D0] border border-goa-dark transition text-goa-dark"
             aria-label="Close"
           >
-            <X className="w-5 h-5 text-[#141414]" />
+            <X className="w-5 h-5 text-goa-dark" />
           </button>
         </div>
 
@@ -84,15 +84,15 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
             return (
               <div
                 key={step.num}
-                className="p-4 bg-white border-2 border-[#141414] flex items-start space-x-4 shadow-brutal-sm"
+                className="p-4 bg-white border-2 border-goa-dark flex items-start space-x-4 shadow-brutal"
               >
-                <div className="w-9 h-9 bg-[#0A2E23] text-[#FAF7F0] flex items-center justify-center font-mono font-bold text-xs shrink-0 border border-[#141414]">
+                <div className="w-9 h-9 bg-goa-green text-goa-cream flex items-center justify-center font-mono font-bold text-xs shrink-0 border border-goa-dark">
                   {step.num}
                 </div>
                 <div className="min-w-0">
-                  <h4 className="font-display font-bold text-sm uppercase tracking-wider text-[#0A2E23] flex items-center gap-2">
-                    <Icon className="w-4 h-4 text-[#F50064]" />
-                    <span className="text-[#0A2E23] font-bold">{step.title}</span>
+                  <h4 className="font-display font-bold text-sm uppercase tracking-wider text-goa-green flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-goa-pink" />
+                    <span className="text-goa-green font-bold">{step.title}</span>
                   </h4>
                   <p className="text-xs font-mono text-[#333333] mt-1 leading-relaxed">
                     {step.desc}
@@ -104,10 +104,10 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
         </div>
 
         {/* Footer */}
-        <div className="mt-6 pt-4 border-t-2 border-[#141414] flex justify-end">
+        <div className="mt-6 pt-4 border-t-2 border-goa-dark flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 bg-[#0A2E23] text-[#FAF7F0] font-mono text-xs font-bold uppercase hover:bg-[#144F3F] transition shadow-brutal-sm border border-[#141414]"
+            className="px-6 py-2.5 bg-goa-green text-goa-cream font-mono text-xs font-bold uppercase hover:bg-[#144F3F] transition shadow-brutal border border-goa-dark"
           >
             [ CLOSE PROTOCOL ]
           </button>

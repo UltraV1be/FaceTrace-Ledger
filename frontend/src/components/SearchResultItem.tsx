@@ -22,10 +22,10 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
 
   return (
     <div
-      className={`p-4 border-2 transition text-[#141414] ${
+      className={`p-4 border-2 transition text-goa-dark ${
         isBestMatch
-          ? 'bg-[#FAF7F0] border-[#F50064] shadow-brutal-pink'
-          : 'bg-white border-[#141414] hover:bg-[#FAF7F0] shadow-brutal-sm'
+          ? 'bg-goa-cream border-goa-pink shadow-brutal'
+          : 'bg-white border-goa-dark hover:bg-goa-cream shadow-brutal'
       }`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -38,13 +38,13 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
             <img
               src={fullThumb}
               alt={candidate.page_title}
-              className="w-14 h-14 object-cover border-2 border-[#141414] shrink-0 bg-[#242424]"
+              className="w-14 h-14 object-cover border-2 border-goa-dark shrink-0 bg-[#242424]"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
           ) : (
-            <div className="w-14 h-14 bg-[#0A2E23] text-[#FAF7F0] flex items-center justify-center shrink-0 border-2 border-[#141414] font-mono text-xs font-bold">
+            <div className="w-14 h-14 bg-goa-green text-goa-cream flex items-center justify-center shrink-0 border-2 border-goa-dark font-mono text-xs font-bold">
               #{index + 1}
             </div>
           )}
@@ -52,18 +52,18 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
           <div className="min-w-0">
             {/* Badges Bar */}
             <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-              <span className="font-mono text-xs font-bold text-[#F50064]">
+              <span className="font-mono text-xs font-bold text-goa-pink">
                 #{String(index + 1).padStart(2, '0')}
               </span>
 
               {/* Platform Badge */}
               {platform ? (
-                <span className="px-2 py-0.5 bg-[#0A2E23] text-[#00E599] text-[10px] font-mono uppercase font-bold flex items-center gap-1">
-                  <Globe className="w-2.5 h-2.5 text-[#00E599]" />
+                <span className="px-2 py-0.5 bg-goa-green text-goa-yellow text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                  <Globe className="w-2.5 h-2.5 text-goa-yellow" />
                   {platform.toUpperCase()}
                 </span>
               ) : (
-                <span className="px-2 py-0.5 bg-[#141414] text-[#FAF7F0] text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-goa-dark text-goa-cream text-[10px] font-mono uppercase font-bold flex items-center gap-1">
                   <Globe className="w-2.5 h-2.5 text-[#AAAAAA]" />
                   {candidate.domain || 'web'}
                 </span>
@@ -71,37 +71,37 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
 
               {/* Result Type Badge */}
               {rtype === 'SOCIAL_MEDIA_POST' && (
-                <span className="px-2 py-0.5 bg-[#F50064] text-white text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-goa-pink text-goa-cream text-[10px] font-mono uppercase font-bold flex items-center gap-1">
                   <Share2 className="w-2.5 h-2.5" />
                   POST
                 </span>
               )}
               {rtype === 'SOCIAL_MEDIA_PROFILE' && (
-                <span className="px-2 py-0.5 bg-[#1D6B56] text-white text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-goa-green text-goa-cream text-[10px] font-mono uppercase font-bold flex items-center gap-1">
                   <UserCheck className="w-2.5 h-2.5" />
                   PROFILE
                 </span>
               )}
               {rtype === 'SOCIAL_MEDIA_PAGE' && (
-                <span className="px-2 py-0.5 bg-[#555555] text-white text-[10px] font-mono uppercase font-bold flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-[#555555] text-goa-cream text-[10px] font-mono uppercase font-bold flex items-center gap-1">
                   <Layers className="w-2.5 h-2.5" />
                   PAGE
                 </span>
               )}
               {rtype === 'GENERAL_WEB_RESULT' && (
-                <span className="px-2 py-0.5 bg-[#EBE3D0] text-[#141414] text-[10px] font-mono uppercase font-bold border border-[#141414]/30">
+                <span className="px-2 py-0.5 bg-[#EBE3D0] text-goa-dark text-[10px] font-mono uppercase font-bold border border-goa-dark/30">
                   GENERAL WEB
                 </span>
               )}
 
               {isBestMatch && (
-                <span className="px-2 py-0.5 bg-[#00E599] text-[#0A2E23] text-[10px] font-mono uppercase font-black">
+                <span className="px-2 py-0.5 bg-goa-yellow text-goa-green text-[10px] font-mono uppercase font-black">
                   ★ TOP VERIFIED MATCH
                 </span>
               )}
             </div>
 
-            <h4 className="font-display font-bold text-sm text-[#141414] truncate max-w-md">
+            <h4 className="font-display font-bold text-sm text-goa-dark truncate max-w-md">
               {candidate.page_title || 'Untitled Web Match'}
             </h4>
 
@@ -109,7 +109,7 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
               href={candidate.url}
               target="_blank"
               rel="noreferrer"
-              className="text-[11px] font-mono text-[#555555] hover:text-[#F50064] truncate block mt-0.5"
+              className="text-[11px] font-mono text-[#555555] hover:text-goa-pink truncate block mt-0.5"
             >
               {candidate.url}
             </a>
@@ -118,19 +118,19 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
         </div>
 
         {/* Right: Score & Link Button */}
-        <div className="flex items-center justify-between sm:justify-end space-x-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[#141414]/15">
+        <div className="flex items-center justify-between sm:justify-end space-x-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-goa-dark/15">
           
           <div className="text-right font-mono">
             <div className="text-[10px] text-[#666666] uppercase font-bold">SIMILARITY</div>
             <div className={`text-base font-bold flex items-center space-x-1 ${
-              candidate.match ? 'text-[#0A2E23]' : 'text-[#777777]'
+              candidate.match ? 'text-goa-green' : 'text-[#777777]'
             }`}>
               {candidate.match ? (
-                <CheckCircle className="w-4 h-4 text-[#00E599]" />
+                <CheckCircle className="w-4 h-4 text-goa-yellow" />
               ) : (
                 <XCircle className="w-4 h-4 text-[#888888]" />
               )}
-              <span className="text-[#141414] font-black">{scorePercent}%</span>
+              <span className="text-goa-dark font-black">{scorePercent}%</span>
             </div>
           </div>
 
@@ -138,7 +138,7 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({
             href={candidate.url}
             target="_blank"
             rel="noreferrer"
-            className="px-3.5 py-2 bg-[#141414] text-[#FAF7F0] hover:bg-[#F50064] hover:text-white transition font-mono text-xs font-bold flex items-center space-x-1.5 shadow-brutal-sm"
+            className="px-3.5 py-2 bg-goa-dark text-goa-cream hover:bg-goa-pink hover:text-goa-cream transition font-mono text-xs font-bold flex items-center space-x-1.5 shadow-brutal"
           >
             <span>VIEW</span>
             <ExternalLink className="w-3.5 h-3.5" />

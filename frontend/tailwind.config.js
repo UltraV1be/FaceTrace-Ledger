@@ -7,6 +7,14 @@ export default {
   theme: {
     extend: {
       colors: {
+        goa: {
+          cream: '#fffbe8',
+          dark: '#14130f',
+          yellow: '#fee101',
+          red: '#fb2c36',
+          pink: '#ff0080',
+          green: '#0b6839',
+        },
         forest: {
           950: '#071F17',
           900: '#0A2E23',
@@ -15,38 +23,38 @@ export default {
           600: '#1D6B56',
         },
         cream: {
-          50: '#FAF7F0',
+          50: '#fffbe8',
           100: '#F5F0E3',
           200: '#EBE3D0',
           300: '#DED3BA',
         },
         pink: {
-          DEFAULT: '#F50064',
+          DEFAULT: '#ff0080',
           hot: '#FF006E',
           light: '#FF3388',
-          glow: 'rgba(245, 0, 100, 0.15)',
+          glow: 'rgba(255, 0, 128, 0.15)',
         },
         charcoal: {
-          DEFAULT: '#141414',
+          DEFAULT: '#14130f',
           light: '#242424',
           muted: '#525252',
         },
         emerald: {
-          DEFAULT: '#00E599',
-          glow: 'rgba(0, 229, 153, 0.15)',
+          DEFAULT: '#0b6839',
+          glow: 'rgba(11, 104, 57, 0.15)',
         }
       },
       fontFamily: {
-        display: ['Syne', 'sans-serif'],
-        sans: ['"Space Grotesk"', 'Inter', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"Space Mono"', 'monospace'],
+        display: ['Imbue', 'serif'],
+        sans: ['"Victor Mono"', 'monospace'],
+        mono: ['"Victor Mono"', 'monospace'],
       },
       boxShadow: {
-        'brutal': '4px 4px 0px 0px #141414',
-        'brutal-pink': '4px 4px 0px 0px #F50064',
-        'brutal-green': '4px 4px 0px 0px #0A2E23',
-        'brutal-sm': '2px 2px 0px 0px #141414',
-        'brutal-lg': '8px 8px 0px 0px #141414',
+        'brutal': '4px 4px 0px 0px #14130f',
+        'brutal-pink': '4px 4px 0px 0px #ff0080',
+        'brutal-green': '4px 4px 0px 0px #0b6839',
+        'brutal-sm': '2px 2px 0px 0px #14130f',
+        'brutal-lg': '8px 8px 0px 0px #14130f',
       }
     },
   },

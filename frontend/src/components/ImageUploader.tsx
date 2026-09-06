@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, Image as ImageIcon, Sparkles, RefreshCw, X } from 'lucide-react';
 import { formatFileSize } from '../utils/formatters';
+import { checkPreflight } from '../services/api';
 
 interface ImageUploaderProps {
   onFileSelected: (file: File | null, sampleFilename?: string) => void;
@@ -23,6 +24,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileDimensions, setFileDimensions] = useState<{ width: number; height: number } | null>(null);
   const [imageHashPrefix, setImageHashPrefix] = useState<string>('');
+  
+  const [isPreflighting, setIsPreflighting] = useState<boolean>(false);
+  const [preflightResult, setPreflightResult] = useState<{ status: string; message: string; faces: number; blur_score: number; face_area_pct: number } | null>(null);
 
   const computeSha256Prefix = async (file: File) => {
     try {
@@ -36,7 +40,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
-  const handleFile = useCallback((file: File) => {
+  const handleFile = useCallback(async (file: File) => {
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
 
@@ -48,6 +52,17 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     computeSha256Prefix(file);
     onFileSelected(file);
+
+    setIsPreflighting(true);
+    setPreflightResult(null);
+    try {
+      const res = await checkPreflight(file);
+      setPreflightResult(res);
+    } catch (err) {
+      setPreflightResult({ status: 'error', message: 'Preflight check failed: ' + (err as Error).message, faces: 0, blur_score: 0, face_area_pct: 0 });
+    } finally {
+      setIsPreflighting(false);
+    }
   }, [onFileSelected]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -67,11 +82,22 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     disabled: isProcessing,
   });
 
-  const handleSelectSample = (sample: { filename: string; url: string }) => {
+  const handleSelectSample = async (sample: { filename: string; url: string }) => {
     setPreviewUrl(`http://localhost:8000${sample.url}`);
     setFileDimensions({ width: 512, height: 512 });
     setImageHashPrefix('7de7ed51a159...7bb72c07');
     onFileSelected(null, sample.filename);
+
+    setIsPreflighting(true);
+    setPreflightResult(null);
+    try {
+      const res = await checkPreflight(undefined, sample.filename);
+      setPreflightResult(res);
+    } catch (err) {
+      setPreflightResult({ status: 'error', message: 'Preflight check failed: ' + (err as Error).message, faces: 0, blur_score: 0, face_area_pct: 0 });
+    } finally {
+      setIsPreflighting(false);
+    }
   };
 
   const handleClear = () => {
@@ -81,21 +107,22 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     setPreviewUrl(null);
     setFileDimensions(null);
     setImageHashPrefix('');
+    setPreflightResult(null);
     onFileSelected(null);
   };
 
   const hasImage = Boolean(previewUrl || selectedFile || sampleFilename);
 
   return (
-    <div className="bg-[#F5F0E3] text-[#141414] border-2 border-[#141414] shadow-brutal p-6 lg:p-8">
+    <div className="bg-goa-cream text-goa-dark border-2 border-goa-dark shadow-brutal p-6 lg:p-8">
       
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b-2 border-[#141414] pb-4 mb-6">
+      <div className="flex items-center justify-between border-b-2 border-goa-dark pb-4 mb-6">
         <div>
-          <span className="text-xs font-mono font-bold text-[#F50064] uppercase tracking-widest block">
+          <span className="text-xs font-mono font-bold text-goa-pink uppercase tracking-widest block">
             STEP 01 // INPUT ACQUISITION
           </span>
-          <h2 className="font-display font-black text-2xl sm:text-3xl tracking-tight text-[#141414] uppercase">
+          <h2 className="font-display font-black text-2xl sm:text-3xl tracking-tight text-goa-dark uppercase">
             TARGET EVIDENCE ARTIFACT
           </h2>
         </div>
@@ -118,17 +145,17 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             {...getRootProps()}
             className={`border-2 border-dashed p-8 sm:p-12 text-center transition cursor-pointer ${
               isDragActive
-                ? 'border-[#F50064] bg-[#F50064]/5 scale-[0.99]'
-                : 'border-[#141414]/50 hover:border-[#141414] bg-white hover:bg-[#FAF7F0]'
+                ? 'border-goa-pink bg-goa-pink/5 scale-[0.99]'
+                : 'border-goa-dark/50 hover:border-goa-dark bg-white hover:bg-goa-cream'
             }`}
           >
             <input {...getInputProps()} />
 
-            <div className="w-14 h-14 mx-auto mb-4 bg-[#0A2E23] text-white flex items-center justify-center border border-[#141414] shadow-brutal-sm">
-              <UploadCloud className="w-7 h-7 text-[#F50064]" />
+            <div className="w-14 h-14 mx-auto mb-4 bg-goa-green text-goa-cream flex items-center justify-center border border-goa-dark shadow-brutal">
+              <UploadCloud className="w-7 h-7 text-goa-pink" />
             </div>
 
-            <p className="font-display font-black text-lg sm:text-xl uppercase text-[#141414] mb-1">
+            <p className="font-display font-black text-lg sm:text-xl uppercase text-goa-dark mb-1">
               {isDragActive ? 'RELEASE IMAGE HERE' : 'DROP FACE IMAGE HERE OR BROWSE'}
             </p>
 
@@ -136,13 +163,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               Supported Formats: JPEG, JPG, PNG, WEBP (Max 15MB). High-resolution frontal portraits recommended.
             </p>
 
-            <span className="inline-block px-5 py-2.5 bg-[#141414] text-[#FAF7F0] font-mono text-xs uppercase font-bold hover:bg-[#F50064] transition shadow-brutal-sm">
+            <span className="inline-block px-5 py-2.5 bg-goa-dark text-goa-cream font-mono text-xs uppercase font-bold hover:bg-goa-pink transition shadow-brutal">
               [ SELECT FILE ]
             </span>
           </div>
 
           {/* Quick Benchmark Samples */}
-          <div className="mt-6 pt-4 border-t border-[#141414]/20">
+          <div className="mt-6 pt-4 border-t border-goa-dark/20">
             <span className="text-[11px] font-mono uppercase font-bold text-[#444444] block mb-2.5">
               OR LOAD BENCHMARK PORTRAIT:
             </span>
@@ -150,18 +177,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               <button
                 type="button"
                 onClick={() => handleSelectSample({ filename: 'lena.jpg', url: '/media/input/lena.jpg' })}
-                className="px-3.5 py-2 bg-white border-2 border-[#141414] hover:bg-[#F50064] hover:text-white font-mono text-xs font-bold text-[#141414] flex items-center space-x-2 transition shadow-brutal-sm group"
+                className="px-3.5 py-2 bg-white border-2 border-goa-dark hover:bg-goa-pink hover:text-goa-cream font-mono text-xs font-bold text-goa-dark flex items-center space-x-2 transition shadow-brutal group"
               >
-                <ImageIcon className="w-4 h-4 text-[#F50064] group-hover:text-white" />
+                <ImageIcon className="w-4 h-4 text-goa-pink group-hover:text-goa-cream" />
                 <span>LENA.JPG (CV Standard)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSelectSample({ filename: 'sample_portrait.jpg', url: '/media/input/sample_portrait.jpg' })}
-                className="px-3.5 py-2 bg-white border-2 border-[#141414] hover:bg-[#F50064] hover:text-white font-mono text-xs font-bold text-[#141414] flex items-center space-x-2 transition shadow-brutal-sm group"
+                className="px-3.5 py-2 bg-white border-2 border-goa-dark hover:bg-goa-pink hover:text-goa-cream font-mono text-xs font-bold text-goa-dark flex items-center space-x-2 transition shadow-brutal group"
               >
-                <Sparkles className="w-4 h-4 text-[#0A2E23] group-hover:text-white" />
+                <Sparkles className="w-4 h-4 text-goa-green group-hover:text-goa-cream" />
                 <span>SAMPLE_PORTRAIT.JPG</span>
               </button>
             </div>
@@ -172,19 +199,19 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           
           {/* Image Display */}
-          <div className="md:col-span-5 bg-[#141414] p-2 border-2 border-[#141414] shadow-brutal relative group">
+          <div className="md:col-span-5 bg-goa-dark p-2 border-2 border-goa-dark shadow-brutal relative group">
             <img
-              src={previewUrl || ''}
+              src={previewUrl || undefined}
               alt="Target Face Artifact"
               className="w-full h-64 object-contain bg-[#242424]"
             />
             {isProcessing && (
-              <div className="absolute inset-2 bg-[#071F17]/85 backdrop-blur-sm flex flex-col items-center justify-center text-[#F5F0E3] p-4 text-center">
-                <RefreshCw className="w-8 h-8 text-[#F50064] animate-spin mb-2" />
-                <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#F50064]">
+              <div className="absolute inset-2 bg-goa-dark/85 backdrop-blur-sm flex flex-col items-center justify-center text-goa-cream p-4 text-center">
+                <RefreshCw className="w-8 h-8 text-goa-pink animate-spin mb-2" />
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-goa-pink">
                   ANALYSIS IN PROGRESS
                 </span>
-                <span className="text-[10px] font-mono text-[#FAF7F0] mt-1">
+                <span className="text-[10px] font-mono text-goa-cream mt-1">
                   Extracting vectors & querying web...
                 </span>
               </div>
@@ -194,36 +221,59 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           {/* Metadata & Actions */}
           <div className="md:col-span-7 flex flex-col justify-between h-full space-y-4">
             
-            <div className="bg-white border-2 border-[#141414] p-4 space-y-2.5 text-xs font-mono text-[#141414]">
-              <div className="flex justify-between border-b border-[#141414]/15 pb-1.5">
+            <div className="bg-white border-2 border-goa-dark p-4 space-y-2.5 text-xs font-mono text-goa-dark">
+              <div className="flex justify-between border-b border-goa-dark/15 pb-1.5">
                 <span className="text-[#666666]">SOURCE FILE:</span>
-                <span className="font-bold text-[#141414] truncate max-w-[200px]">
+                <span className="font-bold text-goa-dark truncate max-w-[200px]">
                   {selectedFile ? selectedFile.name : sampleFilename || 'Target Image'}
                 </span>
               </div>
 
               {fileDimensions && (
-                <div className="flex justify-between border-b border-[#141414]/15 pb-1.5">
+                <div className="flex justify-between border-b border-goa-dark/15 pb-1.5">
                   <span className="text-[#666666]">DIMENSIONS:</span>
-                  <span className="font-bold text-[#141414]">
+                  <span className="font-bold text-goa-dark">
                     {fileDimensions.width} × {fileDimensions.height} PX
                   </span>
                 </div>
               )}
 
               {selectedFile && (
-                <div className="flex justify-between border-b border-[#141414]/15 pb-1.5">
+                <div className="flex justify-between border-b border-goa-dark/15 pb-1.5">
                   <span className="text-[#666666]">FILE SIZE:</span>
-                  <span className="font-bold text-[#141414]">{formatFileSize(selectedFile.size)}</span>
+                  <span className="font-bold text-goa-dark">{formatFileSize(selectedFile.size)}</span>
                 </div>
               )}
 
               <div className="flex justify-between items-center">
                 <span className="text-[#666666]">SHA-256 DIGEST:</span>
-                <span className="font-bold text-[#F50064] bg-[#F50064]/10 px-2 py-0.5 border border-[#F50064]/30 text-[11px]">
+                <span className="font-bold text-goa-pink bg-goa-pink/10 px-2 py-0.5 border border-goa-pink/30 text-[11px]">
                   {imageHashPrefix || 'Calculating...'}
                 </span>
               </div>
+            </div>
+            
+            {/* Preflight Check UI */}
+            <div className="space-y-2">
+              {isPreflighting && (
+                <div className="bg-goa-cream border-2 border-goa-dark p-3 flex items-center justify-center space-x-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-goa-pink" />
+                  <span className="font-mono text-xs font-bold text-goa-dark">RUNNING PRE-FLIGHT CHECKS...</span>
+                </div>
+              )}
+              {!isPreflighting && preflightResult && (
+                <div className={`p-3 border-2 font-mono text-xs ${preflightResult.status === 'error' ? 'bg-red-50 border-red-500 text-red-700' : preflightResult.status === 'warning' ? 'bg-amber-50 border-amber-500 text-amber-700' : 'bg-green-50 border-green-500 text-green-700'}`}>
+                  <div className="font-bold mb-1 uppercase tracking-wider">
+                    {preflightResult.status === 'error' ? '❌ PRE-FLIGHT ERROR' : preflightResult.status === 'warning' ? '⚠️ PRE-FLIGHT WARNING' : '✅ PRE-FLIGHT PASSED'}
+                  </div>
+                  <div className="mb-2">{preflightResult.message}</div>
+                  <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-black/10 text-[10px] font-bold text-goa-dark">
+                    <div>FACES: {preflightResult.faces}</div>
+                    <div>BLUR: {Math.round(preflightResult.blur_score)}</div>
+                    <div>AREA: {preflightResult.face_area_pct.toFixed(1)}%</div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Run Button */}
@@ -231,21 +281,26 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               <button
                 type="button"
                 onClick={onRunTrace}
-                disabled={isProcessing}
-                className={`w-full py-4 px-6 text-sm font-mono uppercase font-bold tracking-wider transition flex items-center justify-center space-x-2 border-2 border-[#141414] shadow-brutal ${
-                  isProcessing
-                    ? 'bg-[#555555] text-white cursor-not-allowed opacity-80'
-                    : 'bg-[#F50064] text-white hover:bg-[#FF006E] active:translate-x-0.5 active:translate-y-0.5 shadow-brutal-pink'
+                disabled={isProcessing || isPreflighting || preflightResult?.status === 'error'}
+                className={`w-full py-4 px-6 text-sm font-mono uppercase font-bold tracking-wider transition flex items-center justify-center space-x-2 border-2 border-goa-dark shadow-brutal ${
+                  isProcessing || isPreflighting || preflightResult?.status === 'error'
+                    ? 'bg-[#555555] text-goa-cream cursor-not-allowed opacity-80'
+                    : 'bg-goa-pink text-goa-cream hover:bg-[#FF006E] active:translate-x-0.5 active:translate-y-0.5 shadow-brutal'
                 }`}
               >
                 {isProcessing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-goa-cream" />
                     <span>TRACE INITIALIZED — EXECUTING...</span>
+                  </>
+                ) : isPreflighting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-goa-cream" />
+                    <span>CHECKING...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4 text-white" />
+                    <Sparkles className="w-4 h-4 text-goa-cream" />
                     <span>[ RUN TRACE ]</span>
                   </>
                 )}
@@ -255,7 +310,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="w-full py-2 text-xs font-mono text-[#555555] hover:text-[#141414] text-center font-bold"
+                  className="w-full py-2 text-xs font-mono text-[#555555] hover:text-goa-dark text-center font-bold"
                 >
                   ← Choose a different image
                 </button>

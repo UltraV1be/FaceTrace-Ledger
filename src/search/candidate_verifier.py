@@ -59,7 +59,7 @@ class CandidateVerifier:
         prioritized_candidates = sorted(candidates, key=get_candidate_priority)
 
         evaluated: List[Dict[str, Any]] = []
-        subset = prioritized_candidates[:max_candidates_to_check]
+        subset = prioritized_candidates
 
         for idx, candidate in enumerate(subset, start=1):
             url = candidate.get("url")
@@ -90,15 +90,16 @@ class CandidateVerifier:
                 sim_score = comparison["similarity_score"]
                 is_match = comparison["match"]
 
-                print(f"  Similarity: {sim_score:.4f} (Threshold: {comparison['threshold']})")
+                print(f"  Similarity: {sim_score:.4f} (Tier: {comparison.get('confidence_tier')})")
                 if is_match:
-                    log_success(f"PASSED THRESHOLD ({rtype})")
+                    log_success(f"PASSED ({comparison.get('confidence_tier')}) - {rtype}")
                 else:
-                    log_fail("BELOW THRESHOLD")
+                    log_fail(f"BELOW THRESHOLD ({comparison.get('confidence_tier')})")
 
                 eval_entry = {
                     **candidate,
                     "similarity_score": sim_score,
+                    "confidence_tier": comparison.get("confidence_tier"),
                     "face_detected": True,
                     "match": is_match,
                     "candidate_local_image": str(cand_image_path)
