@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { ImageUploader } from './components/ImageUploader';
 import { PipelineProgress } from './components/PipelineProgress';
+import { PipelineFailureModal } from './components/PipelineFailureModal';
 import { FaceDetectionResult } from './components/FaceDetectionResult';
 import { SearchResults } from './components/SearchResults';
 import { CandidateComparison } from './components/CandidateComparison';
@@ -15,7 +16,7 @@ import { HowItWorksModal } from './components/HowItWorksModal';
 import { Footer } from './components/Footer';
 import { usePipeline } from './hooks/usePipeline';
 import { getFullMediaUrl } from './services/api';
-import { AlertTriangle, RotateCcw, PlusCircle, ChevronDown, ChevronUp, Terminal, ShieldAlert, Ban } from 'lucide-react';
+import { AlertTriangle, RotateCcw, PlusCircle, ChevronDown, ChevronUp, Terminal, Ban } from 'lucide-react';
 
 export const App: React.FC = () => {
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -29,6 +30,9 @@ export const App: React.FC = () => {
     isProcessing,
     isCancelling,
     isCancelled,
+    currentJobId,
+    isFailureModalOpen,
+    setIsFailureModalOpen,
     stages,
     currentStageId,
     pipelineResult,
@@ -41,6 +45,8 @@ export const App: React.FC = () => {
     startPipeline,
     cancelExecution,
     restartExecution,
+    terminateProcess,
+    startNewProcess,
     resetToNewInvestigation,
     clearHistory,
   } = usePipeline();
@@ -85,8 +91,8 @@ export const App: React.FC = () => {
           />
         </section>
 
-        {/* Live Execution Monitor with Stop & Restart Controls */}
-        {(isProcessing || pipelineResult || errorMessage || isCancelled) && (
+        {/* Live Execution Monitor with Stop, Restart, Blocked Stages & Fail-Fast Indicator */}
+        {(isProcessing || pipelineResult || errorMessage || isCancelled || stages.some((s) => s.status !== 'idle')) && (
           <section id="pipeline-progress-section" className="scroll-mt-20">
             <PipelineProgress
               stages={stages}
@@ -96,7 +102,8 @@ export const App: React.FC = () => {
               isCancelled={isCancelled}
               onStop={cancelExecution}
               onRestart={restartExecution}
-              onNewInvestigation={resetToNewInvestigation}
+              onNewInvestigation={startNewProcess}
+              onOpenFailureModal={() => setIsFailureModalOpen(true)}
             />
           </section>
         )}
@@ -129,18 +136,25 @@ export const App: React.FC = () => {
               {/* Quick Actions */}
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
-                  onClick={restartExecution}
-                  className="px-3 py-1.5 bg-goa-pink text-goa-cream text-xs font-bold uppercase hover:bg-[#FF006E] transition flex items-center space-x-1 shadow-brutal"
+                  onClick={() => setIsFailureModalOpen(true)}
+                  className="px-3 py-1.5 bg-goa-pink text-goa-cream text-xs font-bold uppercase hover:bg-[#FF006E] transition flex items-center space-x-1 shadow-brutal cursor-pointer"
                 >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>RETRY</span>
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>VIEW POPUP</span>
                 </button>
                 <button
-                  onClick={resetToNewInvestigation}
-                  className="px-3 py-1.5 bg-white text-goa-dark text-xs font-bold uppercase hover:bg-goa-cream transition flex items-center space-x-1 shadow-brutal"
+                  onClick={terminateProcess}
+                  className="px-3 py-1.5 bg-red-700 text-goa-cream text-xs font-bold uppercase hover:bg-red-800 transition flex items-center space-x-1 shadow-brutal cursor-pointer"
+                >
+                  <Ban className="w-3 h-3" />
+                  <span>TERMINATE</span>
+                </button>
+                <button
+                  onClick={startNewProcess}
+                  className="px-3 py-1.5 bg-white text-goa-dark text-xs font-bold uppercase hover:bg-goa-cream transition flex items-center space-x-1 shadow-brutal cursor-pointer"
                 >
                   <PlusCircle className="w-3 h-3" />
-                  <span>NEW IMAGE</span>
+                  <span>NEW PROCESS</span>
                 </button>
               </div>
             </div>
@@ -254,6 +268,21 @@ export const App: React.FC = () => {
         )}
 
       </main>
+
+      {/* Floating Fail-Fast Failure Modal Popup */}
+      <PipelineFailureModal
+        isOpen={isFailureModalOpen}
+        onClose={() => setIsFailureModalOpen(false)}
+        errorMessage={errorMessage}
+        errorDetails={errorDetails}
+        stages={stages}
+        currentStageId={currentStageId}
+        executionId={currentJobId}
+        onTerminateProcess={terminateProcess}
+        onStartNewProcess={startNewProcess}
+        onRestart={restartExecution}
+        onNewInvestigation={resetToNewInvestigation}
+      />
 
       {/* History Drawer */}
       <HistoryDrawer

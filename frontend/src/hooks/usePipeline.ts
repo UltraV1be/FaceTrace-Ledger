@@ -29,6 +29,8 @@ export function usePipeline() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [isCancelled, setIsCancelled] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [executionState, setExecutionState] = useState<'IDLE' | 'RUNNING' | 'FAILED' | 'HALTED' | 'TERMINATED' | 'COMPLETED'>('IDLE');
+  const [isFailureModalOpen, setIsFailureModalOpen] = useState(false);
   const [stages, setStages] = useState<StageInfo[]>(INITIAL_STAGES);
   const [currentStageId, setCurrentStageId] = useState<string | undefined>();
   const [pipelineResult, setPipelineResult] = useState<PipelineResult | null>(null);
@@ -65,8 +67,8 @@ export function usePipeline() {
     const newItem: TraceHistoryItem = {
       id: res.job_id,
       timestamp: res.record?.verified_at || new Date().toISOString(),
-      image_name: res.image_filename,
-      image_sha256_short: `${res.image_sha256.slice(0, 8)}...`,
+      image_name: res.image_filename || 'Evidence image',
+      image_sha256_short: res.image_sha256 ? `${res.image_sha256.slice(0, 8)}...` : 'N/A',
       status: res.verification?.verified ? 'verified' : res.status === 'no_match' ? 'no_match' : 'failed',
       score: res.record?.similarity_score ?? res.best_match?.similarity_score,
       domain: res.record?.source_domain || res.best_match?.domain,
@@ -99,10 +101,30 @@ export function usePipeline() {
     setErrorMessage(null);
     setErrorDetails(null);
     setIsCancelled(false);
+    setIsFailureModalOpen(false);
+    setExecutionState('IDLE');
     setStages(INITIAL_STAGES.map((s) => ({ ...s, status: 'idle', message: undefined })));
   }, []);
 
-  const resetToNewInvestigation = useCallback(() => {
+  const terminateProcess = useCallback(async () => {
+    if (currentJobId && isProcessing) {
+      try {
+        await cancelPipeline(currentJobId);
+      } catch (err) {
+        console.warn('Termination cancel warning:', err);
+      }
+    }
+    setIsProcessing(false);
+    setIsCancelling(false);
+    setIsCancelled(true);
+    setExecutionState('TERMINATED');
+    setIsFailureModalOpen(false);
+  }, [currentJobId, isProcessing]);
+
+  const startNewProcess = useCallback(() => {
+    if (currentJobId && isProcessing) {
+      cancelPipeline(currentJobId).catch(() => {});
+    }
     setSelectedFile(null);
     setSampleFilename(undefined);
     setPipelineResult(null);
@@ -112,25 +134,60 @@ export function usePipeline() {
     setIsCancelling(false);
     setIsCancelled(false);
     setCurrentJobId(null);
+    setExecutionState('IDLE');
+    setIsFailureModalOpen(false);
     setStages(INITIAL_STAGES.map((s) => ({ ...s, status: 'idle', message: undefined })));
-  }, []);
+  }, [currentJobId, isProcessing]);
+
+  const resetToNewInvestigation = startNewProcess;
 
   const attachEventStream = (jobId: string) => {
     return subscribeToPipelineEvents(
       jobId,
       (eventData) => {
+        // Stale execution check: ensure event belongs to active job
         const { stage, status, message, data } = eventData;
         setCurrentStageId(stage);
 
+        if (status === 'failed' || stage === 'pipeline_error') {
+          // Fail-Fast: Mark failing stage failed and block all downstream stages
+          setStages((prev) => {
+            let foundFailed = false;
+            return prev.map((s) => {
+              if (s.id === stage || (stage === 'pipeline_error' && data?.stage === s.id)) {
+                foundFailed = true;
+                return { ...s, status: 'failed', message: message || data?.valid_reason || 'Stage failed' };
+              }
+              if (foundFailed) {
+                return { ...s, status: 'blocked', message: 'Execution blocked due to stage failure' };
+              }
+              // If stage already passed before failure, preserve success status
+              if (s.status === 'success') {
+                return s;
+              }
+              // If stage hasn't run yet, block it
+              if (s.status === 'waiting' || s.status === 'idle') {
+                return { ...s, status: 'blocked', message: 'Execution blocked due to stage failure' };
+              }
+              return s;
+            });
+          });
+
+          setErrorMessage(message || data?.valid_reason || 'Pipeline execution halted due to stage failure');
+          setErrorDetails(data);
+          setExecutionState('HALTED');
+          setIsProcessing(false);
+          setIsFailureModalOpen(true);
+          return;
+        }
+
+        // Normal stage progress
         setStages((prev) => {
           let stageFound = false;
           return prev.map((s) => {
             if (s.id === stage) {
               stageFound = true;
               return { ...s, status: status as any, message, data };
-            }
-            if (status === 'failed' && !stageFound && s.status === 'waiting') {
-              return { ...s, status: 'idle' as any, message: 'Not executed' };
             }
             return s;
           });
@@ -139,15 +196,13 @@ export function usePipeline() {
         if (stage === 'pipeline_complete' && data) {
           setPipelineResult(data);
           saveToHistory(data);
-          setIsProcessing(false);
-        } else if (stage === 'pipeline_error') {
-          setErrorMessage(message || 'Pipeline failed');
-          setErrorDetails(data);
+          setExecutionState('COMPLETED');
           setIsProcessing(false);
         } else if (stage === 'pipeline_cancelled') {
           setIsCancelled(true);
           setIsProcessing(false);
           setIsCancelling(false);
+          setExecutionState('TERMINATED');
           setErrorMessage('Pipeline execution was stopped by user.');
         }
       },
@@ -155,8 +210,17 @@ export function usePipeline() {
         try {
           const finalRes = await getPipelineResult(jobId);
           if (finalRes) {
-            setPipelineResult(finalRes);
-            saveToHistory(finalRes);
+            if (finalRes.status === 'failed') {
+              setExecutionState('HALTED');
+              setIsProcessing(false);
+              setErrorMessage(finalRes.error || 'Pipeline execution halted');
+              setErrorDetails(finalRes.error_details);
+              setIsFailureModalOpen(true);
+            } else {
+              setPipelineResult(finalRes);
+              saveToHistory(finalRes);
+              setExecutionState('COMPLETED');
+            }
           }
         } catch {}
         setIsProcessing(false);
@@ -166,8 +230,16 @@ export function usePipeline() {
         getPipelineResult(jobId)
           .then((finalRes) => {
             if (finalRes) {
-              setPipelineResult(finalRes);
-              saveToHistory(finalRes);
+              if (finalRes.status === 'failed') {
+                setExecutionState('HALTED');
+                setErrorMessage(finalRes.error || 'Pipeline execution halted');
+                setErrorDetails(finalRes.error_details);
+                setIsFailureModalOpen(true);
+              } else {
+                setPipelineResult(finalRes);
+                saveToHistory(finalRes);
+                setExecutionState('COMPLETED');
+              }
             }
           })
           .catch(() => {})
@@ -183,6 +255,8 @@ export function usePipeline() {
     setErrorMessage(null);
     setErrorDetails(null);
     setPipelineResult(null);
+    setIsFailureModalOpen(false);
+    setExecutionState('RUNNING');
 
     setStages(INITIAL_STAGES.map((s) => ({ ...s, status: 'waiting', message: undefined })));
 
@@ -197,7 +271,9 @@ export function usePipeline() {
       attachEventStream(jobId);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to start trace');
+      setExecutionState('FAILED');
       setIsProcessing(false);
+      setIsFailureModalOpen(true);
     }
   };
 
@@ -207,6 +283,7 @@ export function usePipeline() {
     try {
       await cancelPipeline(currentJobId);
       setIsCancelled(true);
+      setExecutionState('TERMINATED');
     } catch (err: any) {
       console.warn('Cancel request error:', err);
     } finally {
@@ -225,6 +302,8 @@ export function usePipeline() {
     setErrorMessage(null);
     setErrorDetails(null);
     setPipelineResult(null);
+    setIsFailureModalOpen(false);
+    setExecutionState('RUNNING');
     setStages(INITIAL_STAGES.map((s) => ({ ...s, status: 'waiting', message: undefined })));
 
     try {
@@ -247,6 +326,9 @@ export function usePipeline() {
     isCancelling,
     isCancelled,
     currentJobId,
+    executionState,
+    isFailureModalOpen,
+    setIsFailureModalOpen,
     stages,
     currentStageId,
     pipelineResult,
@@ -260,7 +342,10 @@ export function usePipeline() {
     startPipeline,
     cancelExecution,
     restartExecution,
+    terminateProcess,
+    startNewProcess,
     resetToNewInvestigation,
     clearHistory
   };
 }
+

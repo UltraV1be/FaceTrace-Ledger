@@ -103,12 +103,29 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
 
         # Step 1: Loading image
         loop.run_until_complete(push_event(job_id, "image_loading", "processing", f"Loading image binary ({image_path.name})"))
-        image_sha256 = hash_file(image_path)
-        loop.run_until_complete(push_event(job_id, "image_loading", "success", "Image loaded & fingerprinted", {
-            "image_sha256": image_sha256,
-            "filename": image_path.name,
-            "image_url": f"/media/input/{image_path.name}"
-        }))
+        try:
+            image_sha256 = hash_file(image_path)
+            loop.run_until_complete(push_event(job_id, "image_loading", "success", "Image loaded & fingerprinted", {
+                "image_sha256": image_sha256,
+                "filename": image_path.name,
+                "image_url": f"/media/input/{image_path.name}"
+            }))
+        except Exception as e:
+            err_payload = {
+                "error_code": "IMAGE_ACQUISITION_FAILED",
+                "stage": "image_loading",
+                "stage_name": "01 — ACQUIRE",
+                "stage_number": 1,
+                "valid_reason": f"Failed to acquire image binary or calculate SHA-256 digest: {e}",
+                "details": str(e),
+                "blocked_stages": ["02 — DETECT: BLOCKED", "03 — ENCODE: BLOCKED", "04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "image_loading", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            return
 
         if is_job_cancelled(job_id):
             jobs[job_id]["status"] = "cancelled"
@@ -120,13 +137,53 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
         detector = FaceDetector()
         try:
             face_info = detector.detect_primary_face(image_path)
+            if not face_info or not face_info.get("detected", False):
+                err_payload = {
+                    "error_code": "NO_FACE_DETECTED",
+                    "stage": "face_detection",
+                    "stage_name": "02 — DETECT",
+                    "stage_number": 2,
+                    "valid_reason": "No human face could be detected in the provided image.",
+                    "details": "InsightFace deep neural detector found 0 recognizable facial landmarks in the input image.",
+                    "blocked_stages": ["03 — ENCODE: BLOCKED", "04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+                }
+                jobs[job_id]["status"] = "failed"
+                jobs[job_id]["error"] = err_payload["valid_reason"]
+                jobs[job_id]["error_details"] = err_payload
+                loop.run_until_complete(push_event(job_id, "face_detection", "failed", err_payload["valid_reason"], err_payload))
+                loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+                return
         except FaceDetectionError as e:
-            loop.run_until_complete(push_event(job_id, "face_detection", "failed", str(e), {
+            err_payload = {
                 "error_code": "NO_FACE_DETECTED",
-                "error_details": str(e)
-            }))
+                "stage": "face_detection",
+                "stage_name": "02 — DETECT",
+                "stage_number": 2,
+                "valid_reason": f"Face detection failed: {e}",
+                "details": str(e),
+                "blocked_stages": ["03 — ENCODE: BLOCKED", "04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+            }
             jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = str(e)
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "face_detection", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            return
+        except Exception as e:
+            err_payload = {
+                "error_code": "DETECTION_EXCEPTION",
+                "stage": "face_detection",
+                "stage_name": "02 — DETECT",
+                "stage_number": 2,
+                "valid_reason": f"Face detection engine encountered an error: {e}",
+                "details": str(e),
+                "blocked_stages": ["03 — ENCODE: BLOCKED", "04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "face_detection", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
             return
 
         bbox = face_info["bbox"]
@@ -147,12 +204,36 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
         try:
             input_embedding = encoder.encode(face_info)
         except FaceEncodingError as e:
-            loop.run_until_complete(push_event(job_id, "face_encoding", "failed", str(e), {
+            err_payload = {
                 "error_code": "ENCODING_FAILED",
-                "error_details": str(e)
-            }))
+                "stage": "face_encoding",
+                "stage_name": "03 — ENCODE",
+                "stage_number": 3,
+                "valid_reason": f"Failed to compute 512-dimensional normalized facial embedding vector: {e}",
+                "details": str(e),
+                "blocked_stages": ["04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+            }
             jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = str(e)
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "face_encoding", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            return
+        except Exception as e:
+            err_payload = {
+                "error_code": "ENCODING_EXCEPTION",
+                "stage": "face_encoding",
+                "stage_name": "03 — ENCODE",
+                "stage_number": 3,
+                "valid_reason": f"Facial feature encoding engine error: {e}",
+                "details": str(e),
+                "blocked_stages": ["04 — SEARCH: BLOCKED", "05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "face_encoding", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
             return
 
         loop.run_until_complete(push_event(job_id, "face_encoding", "success", "512-d normalized embedding generated (Ephemeral)", {
@@ -176,30 +257,34 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
         except SerpApiError as e:
             err_payload = {
                 "error_code": e.code,
-                "error_message": e.message,
-                "http_status": e.http_status,
-                "technical_details": e.details,
-                "provider": "serpapi",
-                "engine": "google_lens"
+                "stage": "reverse_search",
+                "stage_name": "04 — SEARCH",
+                "stage_number": 4,
+                "valid_reason": f"Google Lens search provider returned an error: {e.message}",
+                "details": f"HTTP {e.http_status} from {config.reverse_search_provider}: {e.details}",
+                "blocked_stages": ["05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
             }
-            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", e.message, err_payload))
             jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = e.message
+            jobs[job_id]["error"] = err_payload["valid_reason"]
             jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", e.message, err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
             return
         except Exception as e:
             err_payload = {
                 "error_code": "SEARCH_PROVIDER_ERROR",
-                "error_message": str(e),
-                "http_status": None,
-                "technical_details": {"exception": str(e)},
-                "provider": "serpapi",
-                "engine": "google_lens"
+                "stage": "reverse_search",
+                "stage_name": "04 — SEARCH",
+                "stage_number": 4,
+                "valid_reason": f"Reverse visual search engine query failed: {e}",
+                "details": str(e),
+                "blocked_stages": ["05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
             }
-            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", f"Search error: {e}", err_payload))
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
             jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", f"Search error: {e}", err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
             return
 
         parsed_candidates = parse_search_results(raw_results)
@@ -213,8 +298,20 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
         }))
 
         if not raw_results:
-            loop.run_until_complete(push_event(job_id, "candidate_verification", "failed", "No search results returned by provider"))
-            jobs[job_id]["status"] = "no_match"
+            err_payload = {
+                "error_code": "NO_SEARCH_RESULTS",
+                "stage": "reverse_search",
+                "stage_name": "04 — SEARCH",
+                "stage_number": 4,
+                "valid_reason": "No visual candidate matches returned by search engine.",
+                "details": "Google Lens reverse search query returned 0 matches across the public web index.",
+                "blocked_stages": ["05 — COMPARE: BLOCKED", "06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "reverse_search", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
             return
 
         if is_job_cancelled(job_id):
@@ -242,11 +339,26 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
             })
 
         if not best_candidate:
-            loop.run_until_complete(push_event(job_id, "candidate_verification", "failed", "No candidate passed the configured similarity threshold", {
-                "candidates": formatted_candidates
-            }))
-            jobs[job_id]["status"] = "no_match"
+            reason = "No candidate passed the configured comparison threshold."
+            details = f"{len(raw_results)} candidates were returned by SEARCH, but none met the configured comparison threshold ({config.face_match_threshold:.2f})."
+            err_payload = {
+                "error_code": "NO_CANDIDATE_PASSED",
+                "stage": "candidate_verification",
+                "stage_name": "05 — COMPARE",
+                "stage_number": 5,
+                "valid_reason": reason,
+                "details": details,
+                "threshold": config.face_match_threshold,
+                "candidates_checked": len(formatted_candidates),
+                "candidates": formatted_candidates,
+                "blocked_stages": ["06 — FINGERPRINT: BLOCKED", "07 — LEDGER: BLOCKED"]
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = reason
+            jobs[job_id]["error_details"] = err_payload
             jobs[job_id]["candidates"] = formatted_candidates
+            loop.run_until_complete(push_event(job_id, "candidate_verification", "failed", reason, err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", reason, err_payload))
             return
 
         best_local_img = best_candidate.get("candidate_local_image")
@@ -272,30 +384,64 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
 
         # Step 6: Canonical Record
         loop.run_until_complete(push_event(job_id, "canonical_record", "processing", "Constructing canonical JSON record with social provenance"))
-        record = build_verification_record(
-            source_url=best_candidate.get("url", ""),
-            source_domain=best_candidate.get("domain", ""),
-            result_title=best_candidate.get("page_title", "Web Match"),
-            image_sha256=image_sha256,
-            similarity_score=best_candidate.get("similarity_score", 0.0),
-            search_provider=config.reverse_search_provider,
-            result_type=best_candidate.get("result_type", "GENERAL_WEB_RESULT"),
-            is_social_media=best_candidate.get("is_social_media", False),
-            social_platform=best_candidate.get("social_platform"),
-            similarity_threshold=config.face_match_threshold,
-            candidate_image_sha256=cand_img_hash
-        )
-        save_json(record, config.results_dir / "verification_record.json")
-        loop.run_until_complete(push_event(job_id, "canonical_record", "success", "Canonical record created", {"record": record}))
+        try:
+            record = build_verification_record(
+                source_url=best_candidate.get("url", ""),
+                source_domain=best_candidate.get("domain", ""),
+                result_title=best_candidate.get("page_title", "Web Match"),
+                image_sha256=image_sha256,
+                similarity_score=best_candidate.get("similarity_score", 0.0),
+                search_provider=config.reverse_search_provider,
+                result_type=best_candidate.get("result_type", "GENERAL_WEB_RESULT"),
+                is_social_media=best_candidate.get("is_social_media", False),
+                social_platform=best_candidate.get("social_platform"),
+                similarity_threshold=config.face_match_threshold,
+                candidate_image_sha256=cand_img_hash
+            )
+            save_json(record, config.results_dir / "verification_record.json")
+            loop.run_until_complete(push_event(job_id, "canonical_record", "success", "Canonical record created", {"record": record}))
+        except Exception as e:
+            err_payload = {
+                "error_code": "CANONICAL_RECORD_FAILED",
+                "stage": "canonical_record",
+                "stage_name": "06 — FINGERPRINT",
+                "stage_number": 6,
+                "valid_reason": f"Failed to construct deterministic canonical JSON record: {e}",
+                "details": str(e),
+                "blocked_stages": ["07 — LEDGER: BLOCKED"]
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "canonical_record", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            return
 
         # Step 7: Cryptographic Fingerprint
         loop.run_until_complete(push_event(job_id, "crypto_hashing", "processing", "Computing SHA-256 fingerprint"))
-        hash_info = hash_record(record)
-        record_hash = hash_info["hash"]
-        loop.run_until_complete(push_event(job_id, "crypto_hashing", "success", "SHA-256 Fingerprint generated", {
-            "record_hash": record_hash,
-            "canonical_payload": hash_info["canonical_payload"]
-        }))
+        try:
+            hash_info = hash_record(record)
+            record_hash = hash_info["hash"]
+            loop.run_until_complete(push_event(job_id, "crypto_hashing", "success", "SHA-256 Fingerprint generated", {
+                "record_hash": record_hash,
+                "canonical_payload": hash_info["canonical_payload"]
+            }))
+        except Exception as e:
+            err_payload = {
+                "error_code": "HASHING_FAILED",
+                "stage": "crypto_hashing",
+                "stage_name": "06 — FINGERPRINT",
+                "stage_number": 6,
+                "valid_reason": f"Failed to compute SHA-256 digest: {e}",
+                "details": str(e),
+                "blocked_stages": ["07 — LEDGER: BLOCKED"]
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "crypto_hashing", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            return
 
         if is_job_cancelled(job_id):
             jobs[job_id]["status"] = "cancelled"
@@ -304,22 +450,39 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
 
         # Step 8: Blockchain Upload & Re-Verification
         loop.run_until_complete(push_event(job_id, "blockchain_upload", "processing", "Registering record on Ethereum smart contract"))
-        client = BlockchainClient()
-        contract = client.ensure_contract_deployed()
-        uploader = BlockchainUploader(client, contract)
-        upload_result = uploader.upload_record_hash(record_hash)
+        try:
+            client = BlockchainClient()
+            contract = client.ensure_contract_deployed()
+            uploader = BlockchainUploader(client, contract)
+            upload_result = uploader.upload_record_hash(record_hash)
 
-        blockchain_verifier = BlockchainVerifier(client, contract)
-        verification_result = blockchain_verifier.verify_discovered_record(record)
+            blockchain_verifier = BlockchainVerifier(client, contract)
+            verification_result = blockchain_verifier.verify_discovered_record(record)
 
-        loop.run_until_complete(push_event(job_id, "blockchain_upload", "success", "Registered & Verified on blockchain", {
-            "transaction_hash": upload_result["transaction_hash"],
-            "block_number": upload_result["block_number"],
-            "submitter": upload_result["submitter"],
-            "contract_address": client.contract_address,
-            "verified": verification_result["verified"],
-            "timestamp": verification_result["timestamp"]
-        }))
+            loop.run_until_complete(push_event(job_id, "blockchain_upload", "success", "Registered & Verified on blockchain", {
+                "transaction_hash": upload_result["transaction_hash"],
+                "block_number": upload_result["block_number"],
+                "submitter": upload_result["submitter"],
+                "contract_address": client.contract_address,
+                "verified": verification_result["verified"],
+                "timestamp": verification_result["timestamp"]
+            }))
+        except Exception as e:
+            err_payload = {
+                "error_code": "BLOCKCHAIN_FAILED",
+                "stage": "blockchain_upload",
+                "stage_name": "07 — LEDGER",
+                "stage_number": 7,
+                "valid_reason": f"Failed to register or verify cryptographic digest on blockchain contract: {e}",
+                "details": str(e),
+                "blocked_stages": []
+            }
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = err_payload["valid_reason"]
+            jobs[job_id]["error_details"] = err_payload
+            loop.run_until_complete(push_event(job_id, "blockchain_upload", "failed", err_payload["valid_reason"], err_payload))
+            loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", err_payload["valid_reason"], err_payload))
+            return
 
         # Store complete result
         result_payload = {
@@ -371,7 +534,17 @@ def run_pipeline_sync(job_id: str, image_path: Path, require_social_media: bool 
     except Exception as e:
         jobs[job_id]["status"] = "failed"
         jobs[job_id]["error"] = str(e)
-        loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", f"Pipeline failed: {e}"))
+        err_payload = {
+            "error_code": "PIPELINE_EXECUTION_EXCEPTION",
+            "stage": "pipeline_core",
+            "stage_name": "PIPELINE CORE",
+            "stage_number": 0,
+            "valid_reason": f"Pipeline execution error: {e}",
+            "details": str(e),
+            "blocked_stages": []
+        }
+        jobs[job_id]["error_details"] = err_payload
+        loop.run_until_complete(push_event(job_id, "pipeline_error", "failed", f"Pipeline failed: {e}", err_payload))
     finally:
         loop.close()
 

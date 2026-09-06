@@ -11,7 +11,9 @@ export type PipelineStage =
   | 'pipeline_complete'
   | 'pipeline_error';
 
-export type StageStatus = 'idle' | 'processing' | 'success' | 'failed' | 'waiting';
+export type StageStatus = 'idle' | 'processing' | 'success' | 'failed' | 'blocked' | 'cancelled' | 'waiting';
+
+export type ExecutionState = 'IDLE' | 'RUNNING' | 'FAILED' | 'HALTED' | 'TERMINATED' | 'COMPLETED';
 
 export interface StageInfo {
   id: string;
@@ -103,6 +105,8 @@ export interface PipelineResult {
     verified: boolean;
     status: string;
   };
+  error?: string;
+  error_details?: any;
 }
 
 export interface SystemStatus {
