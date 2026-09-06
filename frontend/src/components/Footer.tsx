@@ -31,10 +31,18 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Right */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
+          <a
+            href="https://github.com/UltraV1be/FaceTrace-Ledger"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center space-x-1 px-3 py-1.5 bg-goa-dark border border-goa-dark hover:border-goa-pink text-goa-cream hover:text-goa-pink transition"
+          >
+            <span>GITHUB REPO</span>
+          </a>
           <button
             onClick={scrollToTop}
-            className="flex items-center space-x-1 px-3 py-1.5 bg-goa-dark border border-goa-dark hover:border-goa-pink text-goa-cream hover:text-goa-cream transition"
+            className="flex items-center space-x-1 px-3 py-1.5 bg-goa-dark border border-goa-dark hover:border-goa-pink text-goa-cream hover:text-goa-cream transition cursor-pointer"
           >
             <span>BACK TO TOP</span>
             <ArrowUp className="w-3 h-3" />

@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({ systemStatus, onOpenHistory, onO
           </button>
 
           <a
-            href="https://github.com"
+            href="https://github.com/UltraV1be/FaceTrace-Ledger"
             target="_blank"
             rel="noreferrer"
             className="hidden lg:flex items-center space-x-1 px-3 py-1.5 text-xs font-mono bg-goa-pink text-white font-bold hover:bg-goa-yellow hover:text-goa-dark transition shadow-[2px_2px_0px_0px_#fee101] border-2 border-goa-pink"
