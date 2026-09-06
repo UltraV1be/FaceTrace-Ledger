@@ -23,7 +23,7 @@ const INITIAL_STAGES: StageInfo[] = [
 
 export function usePipeline() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [sampleFilename, setSampleFilename] = useState<string | undefined>('lena.jpg');
+  const [sampleFilename, setSampleFilename] = useState<string | undefined>(undefined);
   const [requireSocialMedia, setRequireSocialMedia] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);

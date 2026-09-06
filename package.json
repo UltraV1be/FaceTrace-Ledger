@@ -1,0 +1,12 @@
+{
+  "name": "facetrace-ledger",
+  "version": "1.0.0",
+  "description": "Biometric reverse image search & immutable on-chain forensic verification ledger",
+  "scripts": {
+    "start": "python start.py || py start.py",
+    "dev": "python start.py || py start.py",
+    "dev:backend": "py -m uvicorn src.api.server:app --port 8000 --host 127.0.0.1 --reload",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build"
+  }
+}
